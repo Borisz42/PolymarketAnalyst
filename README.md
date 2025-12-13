@@ -6,9 +6,13 @@ A Python-based tool to monitor **Polymarket's 15-minute Bitcoin (BTC) Up/Down pr
 
 ### Data Collection
 - **Automated Market Detection**: Automatically finds the currently active 15-minute BTC market
-- **Real-time Data Logging**: Continuously fetches and logs market data every 10 seconds
-- **Robust Error Handling**: Gracefully handles incomplete data and API failures
-- **CSV Storage**: Historical data stored in `market_data.csv` for analysis
+- **Real-time Data Logging**: Continuously fetches and logs market data.
+- **Configurable**: All major features can be configured via `logger_config.json`.
+- **Robust Error Handling**: Gracefully handles incomplete data and API failures with a retry mechanism.
+- **CSV Storage**: Historical data stored in `market_data.csv` for analysis, with optional daily rotation.
+- **Data Validation**: Validates price ranges and detects anomalies.
+- **Market Transition Handling**: Detects market transitions and adds a separator to the CSV file.
+- **Monitoring & Statistics**: Tracks and displays statistics such as uptime, success rate, and average logging latency.
 
 ### Interactive Dashboard
 - **Live Auto-Refresh**: Automatically updates when new data is logged
@@ -89,6 +93,7 @@ Contracts pay out based on whether the price at **Expiration** is higher ("Up") 
 PolymarketAnalyst/
 ├── dashboard.py                  # Streamlit dashboard application
 ├── data_logger.py               # Background data collection service
+├── logger_config.json           # Configuration for the data logger
 ├── arbitrage_bot.py             # Simple console monitor
 ├── fetch_current_polymarket.py  # Core market data fetching logic
 ├── market_data.csv              # Historical data (auto-generated)

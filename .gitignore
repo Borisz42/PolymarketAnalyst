@@ -6,7 +6,16 @@ __pycache__/
 # Environment variables
 .env
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment variables
+.env
+
 # Project specific
 market_urls_*.txt
 debug_polymarket.py
-market_data.csv
+market_data*.csv
+data_logger_errors.log
