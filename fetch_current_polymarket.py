@@ -6,10 +6,6 @@ from get_current_markets import get_current_market_urls
 
 # Configuration
 POLYMARKET_API_URL = "https://gamma-api.polymarket.com/events"
-BINANCE_PRICE_URL = "https://api.binance.com/api/v3/ticker/price"
-BINANCE_KLINES_URL = "https://api.binance.com/api/v3/klines"
-SYMBOL = "BTCUSDT"
-
 CLOB_API_URL = "https://clob.polymarket.com/book"
 
 def get_clob_price(token_id):
@@ -78,39 +74,7 @@ def get_polymarket_data(slug):
     except Exception as e:
         return None, str(e)
 
-def get_binance_current_price():
-    try:
-        response = requests.get(BINANCE_PRICE_URL, params={"symbol": SYMBOL})
-        response.raise_for_status()
-        data = response.json()
-        return float(data["price"]), None
-    except Exception as e:
-        return None, str(e)
 
-def get_binance_open_price(target_time_utc):
-    try:
-        # Timestamp in milliseconds
-        timestamp_ms = int(target_time_utc.timestamp() * 1000)
-        
-        # Fetch 1h kline for the specific timestamp
-        params = {
-            "symbol": SYMBOL,
-            "interval": "15m",
-            "startTime": timestamp_ms,
-            "limit": 1
-        }
-        response = requests.get(BINANCE_KLINES_URL, params=params)
-        response.raise_for_status()
-        data = response.json()
-        
-        if not data:
-            return None, "Candle not found yet"
-            
-        # Kline format: [Open time, Open, High, Low, Close, Volume, ...]
-        open_price = float(data[0][1])
-        return open_price, None
-    except Exception as e:
-        return None, str(e)
 
 def fetch_polymarket_data_struct():
     """
@@ -128,21 +92,16 @@ def fetch_polymarket_data_struct():
         
         # Fetch Data
         poly_prices, poly_err = get_polymarket_data(slug)
-        current_price, curr_err = get_binance_current_price()
-        price_to_beat, beat_err = get_binance_open_price(target_time_utc)
         
         if poly_err:
             return None, f"Polymarket Error: {poly_err}"
             
         return {
-            "price_to_beat": price_to_beat,
-            "current_price": current_price,
             "prices": poly_prices, # {'Up': 0.xx, 'Down': 0.xx}
             "slug": slug,
             "target_time_utc": target_time_utc,
             "expiration_time_utc": expiration_time_utc
-        }, None
-        
+        }, None        
     except Exception as e:
         return None, str(e)
 
@@ -156,16 +115,6 @@ def main():
     print(f"Fetching data for: {data['slug']}")
     print(f"Target Time (UTC): {data['target_time_utc']}")
     print("-" * 50)
-    
-    if data['price_to_beat'] is None:
-         print("PRICE TO BEAT: Error")
-    else:
-        print(f"PRICE TO BEAT: ${data['price_to_beat']:,.2f}")
-
-    if data['current_price'] is None:
-        print("CURRENT PRICE: Error")
-    else:
-        print(f"CURRENT PRICE: ${data['current_price']:,.2f}")
     
     up_price = data['prices'].get("Up", 0)
     down_price = data['prices'].get("Down", 0)

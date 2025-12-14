@@ -25,7 +25,7 @@ def get_current_market_urls():
     
     return {
         "polymarket": polymarket_url,
-        "target_time_utc": start_time_utc, # Using Start Time for Binance lookup
+        "target_time_utc": start_time_utc,
         "expiration_time_utc": target_time,
         "target_time_et": start_time_utc.astimezone(pytz.timezone('US/Eastern'))
     }
