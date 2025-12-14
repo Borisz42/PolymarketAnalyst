@@ -1,41 +1,64 @@
 import pandas as pd
 import datetime
 import os
+from collections import deque
 
 DATA_FILE = "market_data.csv"
 
 # Global Configuration Variables
 INITIAL_CAPITAL = 1000.0
-SHARE_SIZE = 100
-BUY_THRESHOLD = 0.85
+SHARE_SIZE = 1000
+# New global parameters for the derivative moving average strategy
+DERIVATIVE_MA_PERIOD = 5 # Number of periods for the moving average of the derivative
+DERIVATIVE_THRESHOLD = 0.001 # A small threshold to act as a buffer around zero for derivative MA
 
-class SimpleStrategy:
+class DerivativeMovingAverageStrategy:
     def __init__(self):
-        self.traded_markets = set() # To ensure only one trade per market
+        self.traded_markets = set() # To ensure only one trade per market per strategy instance
         self.investment_amount = SHARE_SIZE # Use global SHARE_SIZE
+        # Store price history for each market to calculate derivative moving average
+        # Key: (TargetTime, Expiration)
+        # Value: deque of (UpPrice, DownPrice) tuples for DERIVATIVE_MA_PERIOD + 1 entries
+        self.market_price_history = {} 
 
     def decide(self, market_data_point, current_capital):
-        """
-        Decides whether to place a trade based on the strategy.
-        Returns (side, quantity, entry_price) if a trade is made, otherwise None.
-        """
         market_identifier = (market_data_point['TargetTime'], market_data_point['Expiration'])
         
         if market_identifier in self.traded_markets:
             return None # Already traded this market
 
-        up_price = market_data_point['UpPrice']
-        down_price = market_data_point['DownPrice']
+        current_up_price = market_data_point['UpPrice']
+        current_down_price = market_data_point['DownPrice']
+
+        # Get/create price history for this market
+        if market_identifier not in self.market_price_history:
+            self.market_price_history[market_identifier] = deque(maxlen=DERIVATIVE_MA_PERIOD + 1)
+        
+        # Append current prices to history
+        self.market_price_history[market_identifier].append((current_up_price, current_down_price))
+
+        price_history = self.market_price_history[market_identifier]
+
+        # Ensure we have enough data points to calculate the MA of derivatives
+        if len(price_history) < DERIVATIVE_MA_PERIOD + 1:
+            return None # Not enough history yet
+
+        # Calculate the derivative moving average for UpPrice
+        # Simplified: (Current Price - Price from DERIVATIVE_MA_PERIOD ago) / DERIVATIVE_MA_PERIOD
+        ma_up_derivative = (price_history[-1][0] - price_history[0][0]) / DERIVATIVE_MA_PERIOD
+        
+        # Calculate the derivative moving average for DownPrice
+        ma_down_derivative = (price_history[-1][1] - price_history[0][1]) / DERIVATIVE_MA_PERIOD
 
         side = None
         entry_price = 0.0
 
-        if up_price > BUY_THRESHOLD:
+        if ma_up_derivative > DERIVATIVE_THRESHOLD:
             side = 'Up'
-            entry_price = up_price
-        elif down_price > BUY_THRESHOLD: # Use elif to prioritize Up if both conditions met, or if only one possible.
+            entry_price = current_up_price
+        elif ma_down_derivative < -DERIVATIVE_THRESHOLD: # Negative derivative for Down means price is decreasing
             side = 'Down'
-            entry_price = down_price
+            entry_price = current_down_price
         
         if side and (self.investment_amount * entry_price) <= current_capital:
             self.traded_markets.add(market_identifier)
@@ -236,7 +259,7 @@ if __name__ == "__main__":
         print(e)
         exit()
 
-    strategy = SimpleStrategy()
+    strategy = DerivativeMovingAverageStrategy() # Use the new strategy
     backtester.run_strategy(strategy)
     backtester.generate_report()
 
