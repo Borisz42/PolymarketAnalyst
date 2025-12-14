@@ -27,7 +27,13 @@ A Python-based tool to monitor **Polymarket's 15-minute Bitcoin (BTC) Up/Down pr
 A script (`backtester.py`) that simulates the execution of a trading strategy on historical Polymarket data.
 
 #### Strategy
-The backtester starts with an `INITIAL_CAPITAL` of $1000. It buys a fixed `SHARE_SIZE` of 100 shares for either the 'Up' or 'Down' side as soon as its price exceeds a `BUY_THRESHOLD` of $0.85. The position is held until the market's expiration.
+The backtester now employs the `DerivativeMovingAverageStrategy`. This strategy analyzes the price movement by calculating a moving average of price derivatives.
+
+- It tracks the `DERIVATIVE_MA_PERIOD` (e.g., 10 periods) moving average of price changes.
+- If the derivative moving average for 'UpPrice' exceeds a `DERIVATIVE_THRESHOLD` (e.g., 0.005), it suggests an upward trend, and the strategy buys 'Up' shares.
+- If the derivative moving average for 'DownPrice' falls below `-DERIVATIVE_THRESHOLD`, it suggests a downward trend, and the strategy buys 'Down' shares.
+- Trades are considered on every `N_TICK_POINT`-th data point for a given market, allowing for less frequent trading.
+- The backtester supports multiple open positions for the same market ID.
 
 #### Winning Condition
 A direction (Up or Down) is considered to have "won" if its own price is exactly $0 at the last available data point before the market's expiration date. Each share of the winning side pays out $1. If neither side's price reaches exactly $0, the trade is considered a loss for the position held.
@@ -35,8 +41,13 @@ A direction (Up or Down) is considered to have "won" if its own price is exactly
 #### Configuration
 The backtester's behavior can be easily adjusted by modifying the following global variables at the beginning of `backtester.py`:
 - `INITIAL_CAPITAL`: The starting capital for the simulation (default: $1000.0).
-- `SHARE_SIZE`: The number of shares to buy in each trade (default: 100).
-- `BUY_THRESHOLD`: The price point (e.g., 0.85) at which the strategy initiates a buy order for a side.
+- `SHARE_SIZE`: The number of shares to buy in each trade (default: 2).
+- `DERIVATIVE_MA_PERIOD`: The number of periods for calculating the moving average of the derivative (default: 10).
+- `DERIVATIVE_THRESHOLD`: A small threshold (e.g., 0.005) used to filter out minor fluctuations in the derivative moving average.
+- `N_TICK_POINT`: Determines trading frequency, e.g., trade on every N-th data point (default: 1).
+
+#### Consolidated Market Summaries
+Upon market resolution, the backtester now provides a single, consolidated summary for each market. This summary includes the total PnL, total shares traded for 'Up' and 'Down' sides, and their average entry prices, offering a clear overview of market performance rather than individual position resolutions.
 
 
 #### How to Run Data fetcher and Dashboard
