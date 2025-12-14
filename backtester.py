@@ -7,11 +7,11 @@ DATA_FILE = "market_data.csv"
 
 # Global Configuration Variables
 INITIAL_CAPITAL = 1000.0
-SHARE_SIZE = 1
+SHARE_SIZE = 2
 # New global parameters for the derivative moving average strategy
-DERIVATIVE_MA_PERIOD = 5 # Number of periods for the moving average of the derivative
-DERIVATIVE_THRESHOLD = 0.001 # A small threshold to act as a buffer around zero for derivative MA
-N_TICK_POINT = 2 # Trade on every N-th data point for a given market
+DERIVATIVE_MA_PERIOD = 10 # Number of periods for the moving average of the derivative
+DERIVATIVE_THRESHOLD = 0.005 # A small threshold to act as a buffer around zero for derivative MA
+N_TICK_POINT = 1 # Trade on every N-th data point for a given market
 
 class DerivativeMovingAverageStrategy:
     def __init__(self):
@@ -107,42 +107,34 @@ class Backtester:
 
         print(f"Loaded {len(self.market_data)} data points from {file_path}")
 
-    def _resolve_market(self, market_id_tuple, position):
-        """Resolves an expired market position."""
+    def _resolve_single_position(self, market_id_tuple, position, current_timestamp):
+        """Resolves a single expired market position and returns its PnL details."""
         if market_id_tuple not in self.market_history:
-            print(f"Error: Market history not found for {market_id_tuple}")
-            return
+            # This should ideally not happen if data is loaded correctly
+            # and market_id_tuple comes from an existing position
+            return {'pnl': 0, 'winning_side': 'Error'} 
 
-        # Get all data points for this specific market
         market_specific_data = self.market_history[market_id_tuple]
-
-        last_dp = market_specific_data[-1]
-        market_id_formatted = f"({market_id_tuple[0].strftime('%Y-%m-%d %H:%M:%S')}, {market_id_tuple[1].strftime('%Y-%m-%d %H:%M:%S')})"
-
+        last_dp = market_specific_data[-1] # The final state of the market
 
         winning_side = None
-        if last_dp['UpPrice'] == 0:  # If Up price is 0, then Up wins (as per user's literal phrasing)
+        if last_dp['UpPrice'] == 0:  # If Up price is 0, then Up wins
             winning_side = 'Up'
-        elif last_dp['DownPrice'] == 0: # If Down price is 0, then Down wins (as per user's literal phrasing)
+        elif last_dp['DownPrice'] == 0: # If Down price is 0, then Down wins
             winning_side = 'Down'
         else:
-            print(f"Warning: Market {market_id_formatted} did not resolve with a 0 price for either side. Assuming loss for any held position (neither side's price went to 0).")
             winning_side = 'Neither' # Effectively a loss for any held position
         
-        # Calculate PnL for reporting and update capital based on payout
         pnl = 0
 
         if position['side'] == winning_side:
-            pnl = position['quantity'] * (1 - position['entry_price']) # Each share pays $1 on win, so profit is (1 - entry_price) per share
-            self.capital += position['quantity'] # Add the $1 per share payout
+            pnl = position['quantity'] * (1 - position['entry_price'])
+            self.capital += position['quantity']
         else:
-            # If our side didn't win, we lose the money spent on shares
             pnl = - (position['quantity'] * position['entry_price'])
-            # Capital is not changed here, as the cost was already deducted when buying
-
 
         self.transactions.append({
-            'Timestamp': last_dp['Timestamp'],
+            'Timestamp': current_timestamp,
             'Type': 'Resolution',
             'MarketID': market_id_tuple,
             'Side': position['side'],
@@ -153,7 +145,43 @@ class Backtester:
             'WinningSide': winning_side
         })
         
-        print(f"Resolved market ({market_id_tuple[0].strftime('%Y-%m-%d %H:%M:%S')}, {market_id_tuple[1].strftime('%Y-%m-%d %H:%M:%S')}): Trade Side: {position['side']}, Winning Side: {winning_side}. PnL: ${pnl:.2f}")
+        # Return details for aggregation
+        return {
+            'market_id': market_id_tuple,
+            'side': position['side'],
+            'quantity': position['quantity'],
+            'entry_price': position['entry_price'],
+            'pnl': pnl,
+            'winning_side': winning_side
+        }
+
+    def _print_market_summary(self, market_id_tuple, resolved_positions_data):
+        """Prints a consolidated summary for a fully resolved market."""
+        market_id_formatted = f"({market_id_tuple[0].strftime('%Y-%m-%d %H:%M:%S')}, {market_id_tuple[1].strftime('%Y-%m-%d %H:%M:%S')})"
+
+        total_up_shares = 0
+        total_up_cost = 0.0
+        total_down_shares = 0
+        total_down_cost = 0.0
+        total_market_pnl = 0.0
+
+        for res in resolved_positions_data:
+            total_market_pnl += res['pnl']
+            if res['side'] == 'Up':
+                total_up_shares += res['quantity']
+                total_up_cost += res['quantity'] * res['entry_price']
+            elif res['side'] == 'Down':
+                total_down_shares += res['quantity']
+                total_down_cost += res['quantity'] * res['entry_price']
+        
+        avg_up_price = total_up_cost / total_up_shares if total_up_shares > 0 else 0.0
+        avg_down_price = total_down_cost / total_down_shares if total_down_shares > 0 else 0.0
+
+        print(f"\n--- Market Resolution Summary for {market_id_formatted} ---")
+        print(f"Total PnL for market: ${total_market_pnl:.2f}")
+        print(f"Up Shares: {total_up_shares}, Avg Entry Price: ${avg_up_price:.2f}")
+        print(f"Down Shares: {total_down_shares}, Avg Entry Price: ${avg_down_price:.2f}")
+        print("--------------------------------------------------")
 
 
     def run_strategy(self, strategy_instance):
@@ -163,23 +191,44 @@ class Backtester:
         for ts_np in unique_timestamps:
             current_timestamp = pd.to_datetime(ts_np)
             
-            # Process open positions for expiration at current_timestamp or earlier
-            # Iterate over a copy of the list to allow modification during iteration
-            resolving_positions = self.open_positions[:]
-            for position in resolving_positions:
-                if current_timestamp >= position['expiration']:
-                    self._resolve_market(position['market_id'], position)
-                    self.open_positions.remove(position) # Remove from the original list
+            # Use a list to hold positions to remove to avoid modifying list during iteration
+            positions_to_remove_indices = []
             
+            # Collect all resolved positions at this timestamp, grouped by market_id_tuple
+            resolved_positions_collector = {} # Key: market_id_tuple, Value: list of individual position resolution details
+
+            # Process open positions for expiration at current_timestamp or earlier
+            for i, position in enumerate(self.open_positions):
+                if current_timestamp >= position['expiration']:
+                    market_id_tuple = position['market_id']
+                    
+                    resolved_info = self._resolve_single_position(market_id_tuple, position, current_timestamp)
+                    
+                    if market_id_tuple not in resolved_positions_collector:
+                        resolved_positions_collector[market_id_tuple] = []
+                    resolved_positions_collector[market_id_tuple].append(resolved_info)
+                    
+                    positions_to_remove_indices.append(i)
+            
+            # Remove resolved positions from self.open_positions (iterate in reverse to avoid index issues)
+            for index in sorted(positions_to_remove_indices, reverse=True):
+                del self.open_positions[index]
+
+            # Print summary for markets that are fully resolved at this timestamp
+            for market_id_tuple, resolutions_data in resolved_positions_collector.items():
+                # A market is fully resolved at this timestamp if all its positions expired
+                # and none are remaining in self.open_positions. Given that we delete positions
+                # from open_positions for which current_timestamp >= expiration,
+                # any market_id_tuple in resolved_positions_collector means all its positions
+                # with this expiration have been resolved.
+                self._print_market_summary(market_id_tuple, resolutions_data)
+
             # Get all data points for the current timestamp
             current_data_points = self.market_data[self.market_data['Timestamp'] == current_timestamp]
 
             for _, row in current_data_points.iterrows():
                 market_id_tuple = (row['TargetTime'], row['Expiration'])
                 
-                # The strategy is now responsible for deciding when to trade,
-                # we no longer prevent multiple trades per market here.
-
                 trade_decision = strategy_instance.decide(row, self.capital)
                 
                 if trade_decision:
@@ -213,10 +262,18 @@ class Backtester:
         
         # After iterating through all timestamps, resolve any remaining open positions
         # Iterate over a copy of the list for final resolution
-        remaining_positions = self.open_positions[:]
-        for position in remaining_positions:
-            self._resolve_market(position['market_id'], position)
+        final_resolved_positions_collector = {}
+        for position in self.open_positions[:]: # Use a copy to allow modification
+            market_id_tuple = position['market_id']
+            resolved_info = self._resolve_single_position(market_id_tuple, position, current_timestamp) # Use last current_timestamp or position['expiration']
+            
+            if market_id_tuple not in final_resolved_positions_collector:
+                final_resolved_positions_collector[market_id_tuple] = []
+            final_resolved_positions_collector[market_id_tuple].append(resolved_info)
             self.open_positions.remove(position) # Remove from original list
+
+        for market_id_tuple, resolutions_data in final_resolved_positions_collector.items():
+            self._print_market_summary(market_id_tuple, resolutions_data)
             
     def generate_report(self):
         print("\n--- Backtest Report ---")
