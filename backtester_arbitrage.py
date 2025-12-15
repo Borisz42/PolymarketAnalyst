@@ -11,9 +11,9 @@ INITIAL_CAPITAL = 1000.0
 class RebalancingStrategy:
     def __init__(self):
         # Parameters from plan
-        self.SAFETY_MARGIN_M = 0.98
+        self.SAFETY_MARGIN_M = 0.99
         self.MAX_TRADE_SIZE = 500
-        self.MIN_BALANCE_QTY = 1
+        self.MIN_BALANCE_QTY = 10
 
         # Portfolio state per market
         self.portfolio_state = {}  # key: market_id, value: {'qty_yes': int, 'qty_no': int, 'cost_yes': float, 'cost_no': float}
@@ -34,13 +34,13 @@ class RebalancingStrategy:
         
         new_combined_avg_p = -1
 
-        if target_side == 'Up':  # 'Up' is YES
+        if target_side == 'Up':
             new_cost_yes = cost_yes + qty_to_buy * price
             new_qty_yes = qty_yes + qty_to_buy
             if new_qty_yes == 0: return False
             new_avg_p_yes = new_cost_yes / new_qty_yes
             new_combined_avg_p = new_avg_p_yes + avg_p_no
-        elif target_side == 'Down':  # 'Down' is NO
+        elif target_side == 'Down':
             new_cost_no = cost_no + qty_to_buy * price
             new_qty_no = qty_no + qty_to_buy
             if new_qty_no == 0: return False
@@ -54,65 +54,35 @@ class RebalancingStrategy:
     def decide(self, market_data_point, current_capital):
         market_id = (market_data_point['TargetTime'], market_data_point['Expiration'])
         portfolio = self._get_or_init_portfolio(market_id)
-
         qty_yes = portfolio['qty_yes']
         qty_no = portfolio['qty_no']
-
-        # --- LOGIC FOR BALANCED PORTFOLIO (Increase Position) ---
-        if qty_yes == qty_no:
-            if qty_yes >= self.MAX_TRADE_SIZE:
-                return None
-
-            price_yes = market_data_point['UpPrice']
-            price_no = market_data_point['DownPrice']
-
-            # Only increase position if buying a pair is profitable
-            if price_yes > 0 and price_no > 0 and (price_yes + price_no < self.SAFETY_MARGIN_M):
-                side_to_buy = 'Up'
-                price_to_buy = price_yes
-                
-                # Determine the max quantity we can possibly add
-                qty_to_try = self.MAX_TRADE_SIZE - qty_yes
-                
-                # Search for the largest, safe, and affordable quantity to buy
-                while qty_to_try > 0:
-                    cost = qty_to_try * price_to_buy
-                    if cost > current_capital:
-                        qty_to_try -= 1
-                        continue
-
-                    if self.check_safety_margin(portfolio, side_to_buy, qty_to_try, price_to_buy):
-                        # Found the optimal amount, return it
-                        return (side_to_buy, qty_to_try, price_to_buy)
-
-                    qty_to_try -= 1
-            
-            return None # Conditions not met to increase position
-
-        # --- LOGIC FOR UNBALANCED PORTFOLIO (Rebalancing) ---
-        quantity_delta = abs(qty_yes - qty_no)
-
-        if quantity_delta < self.MIN_BALANCE_QTY:
-            return None 
-
         price_yes = market_data_point['UpPrice']
         price_no = market_data_point['DownPrice']
 
-        target_side = None
-        target_price = 0.0
+        # --- Priority 1: ARBITRAGE on a BALANCED portfolio ---
+        if qty_yes == qty_no:
+            is_arbitrage_opportunity = price_yes > 0 and price_no > 0 and (price_yes + price_no < self.SAFETY_MARGIN_M)
+            if is_arbitrage_opportunity and qty_yes < self.MAX_TRADE_SIZE:
+                cost_per_pair = price_yes + price_no
+                max_qty_by_capital = int(current_capital / cost_per_pair) if cost_per_pair > 0 else 0
+                max_qty_by_size = self.MAX_TRADE_SIZE - qty_yes
+                qty_to_buy = min(max_qty_by_capital, max_qty_by_size)
 
-        if qty_yes > qty_no:
-            target_side = 'Down'
-            target_price = price_no
-        else: # qty_no > qty_yes
-            target_side = 'Up'
-            target_price = price_yes
+                if qty_to_buy > 0:
+                    return ('Arbitrage', qty_to_buy, price_yes, price_no)
+
+        # --- Priority 2: REBALANCING ---
+        quantity_delta = abs(qty_yes - qty_no)
+        if quantity_delta < self.MIN_BALANCE_QTY:
+            return None 
+
+        target_side = 'Down' if qty_yes > qty_no else 'Up'
+        target_price = price_no if target_side == 'Down' else price_yes
         
         if target_price <= 0:
             return None
 
         qty_to_buy = int(min(quantity_delta, self.MAX_TRADE_SIZE))
-
         while qty_to_buy > 0:
             cost = qty_to_buy * target_price
             if cost > current_capital:
@@ -140,11 +110,11 @@ class Backtester:
     def __init__(self, initial_capital=INITIAL_CAPITAL):
         self.initial_capital = initial_capital
         self.capital = initial_capital
-        self.transactions = [] # List of (timestamp, type, market_id, side, quantity, price, value, PnL)
-        self.open_positions = [] # Changed to a list to allow multiple open positions per market
+        self.transactions = []
+        self.open_positions = []
         self.market_data = pd.DataFrame()
-        self.market_history = {} # Stores historical data grouped by market for resolution
-        self.pending_market_summaries = {} # Key: market_id_tuple, Value: list of resolved_position_info dictionaries
+        self.market_history = {}
+        self.pending_market_summaries = {}
 
     def load_data(self, file_path):
         if not os.path.exists(file_path):
@@ -152,18 +122,12 @@ class Backtester:
         
         self.market_data = pd.read_csv(file_path)
         
-        # Convert relevant columns to datetime objects
         self.market_data['Timestamp'] = pd.to_datetime(self.market_data['Timestamp']).dt.tz_localize('UTC').dt.tz_convert('UTC')
-        # TargetTime and Expiration are now output as naive strings by data_logger.py,
-        # but they represent UTC times, so localize them to UTC after parsing.
         self.market_data['TargetTime'] = pd.to_datetime(self.market_data['TargetTime']).dt.tz_localize('UTC').dt.tz_convert('UTC')
         self.market_data['Expiration'] = pd.to_datetime(self.market_data['Expiration']).dt.tz_localize('UTC').dt.tz_convert('UTC')
         
-        # Sort data by timestamp to ensure chronological processing
         self.market_data.sort_values(by='Timestamp', inplace=True)
 
-        # Group data by market identifier for easier lookup during resolution
-        # A market is uniquely identified by its TargetTime and Expiration
         for _, row in self.market_data.iterrows():
             market_id = (row['TargetTime'], row['Expiration'])
             if market_id not in self.market_history:
@@ -173,27 +137,23 @@ class Backtester:
         print(f"Loaded {len(self.market_data)} data points from {file_path}")
 
     def _resolve_single_position(self, market_id_tuple, position, current_timestamp):
-        """Resolves a single expired market position and returns its PnL details."""
         if market_id_tuple not in self.market_history:
-            # This should ideally not happen if data is loaded correctly
-            # and market_id_tuple comes from an existing position
             return {'pnl': 0, 'winning_side': 'Error'} 
 
         market_specific_data = self.market_history[market_id_tuple]
-        last_dp = market_specific_data[-1] # The final state of the market
+        last_dp = market_specific_data[-1]
 
         winning_side = None
         if last_dp['UpPrice'] == 0:  # If Up price is 0, then Up wins
             winning_side = 'Up'
         elif last_dp['DownPrice'] == 0: # If Down price is 0, then Down wins
             winning_side = 'Down'
-        elif last_dp['DownPrice'] > last_dp['UpPrice']: # If Down price is 0, then Down wins
+        elif last_dp['UpPrice'] > last_dp['DownPrice']:
             winning_side = 'Down'
         else:
-            winning_side = 'Up' 
+            winning_side = 'Up'
         
         pnl = 0
-
         if position['side'] == winning_side:
             pnl = position['quantity'] * (1 - position['entry_price'])
             self.capital += position['quantity']
@@ -201,36 +161,19 @@ class Backtester:
             pnl = - (position['quantity'] * position['entry_price'])
 
         self.transactions.append({
-            'Timestamp': current_timestamp,
-            'Type': 'Resolution',
-            'MarketID': market_id_tuple,
-            'Side': position['side'],
-            'Quantity': position['quantity'],
-            'EntryPrice': position['entry_price'],
-            'Value': position['quantity'] * position['entry_price'],
-            'PnL': pnl,
-            'WinningSide': winning_side
+            'Timestamp': current_timestamp, 'Type': 'Resolution', 'MarketID': market_id_tuple,
+            'Side': position['side'], 'Quantity': position['quantity'], 'EntryPrice': position['entry_price'],
+            'Value': position['quantity'] * position['entry_price'], 'PnL': pnl, 'WinningSide': winning_side
         })
         
-        # Return details for aggregation
         return {
-            'market_id': market_id_tuple,
-            'side': position['side'],
-            'quantity': position['quantity'],
-            'entry_price': position['entry_price'],
-            'pnl': pnl,
-            'winning_side': winning_side
+            'market_id': market_id_tuple, 'side': position['side'], 'quantity': position['quantity'],
+            'entry_price': position['entry_price'], 'pnl': pnl, 'winning_side': winning_side
         }
 
     def _print_market_summary(self, market_id_tuple, resolved_positions_data):
-        """Prints a consolidated summary for a fully resolved market."""
         market_id_formatted = f"({market_id_tuple[0].strftime('%Y-%m-%d %H:%M:%S')}, {market_id_tuple[1].strftime('%Y-%m-%d %H:%M:%S')})"
-
-        total_up_shares = 0
-        total_up_cost = 0.0
-        total_down_shares = 0
-        total_down_cost = 0.0
-        total_market_pnl = 0.0
+        total_up_shares, total_up_cost, total_down_shares, total_down_cost, total_market_pnl = 0, 0.0, 0, 0.0, 0.0
 
         for res in resolved_positions_data:
             total_market_pnl += res['pnl']
@@ -250,7 +193,6 @@ class Backtester:
         print(f"Down Shares: {total_down_shares}, Avg Entry Price: ${avg_down_price:.2f}")
         print("--------------------------------------------------")
 
-
     def run_strategy(self, strategy_instance):
         current_timestamp = None
         unique_timestamps = self.market_data['Timestamp'].unique()
@@ -260,82 +202,79 @@ class Backtester:
             
             positions_to_remove_indices = []
             
-            # Process open positions for expiration at current_timestamp or earlier
             for i, position in enumerate(self.open_positions):
                 if current_timestamp >= position['expiration']:
                     market_id_tuple = position['market_id']
-                    
                     resolved_info = self._resolve_single_position(market_id_tuple, position, current_timestamp)
-                    
                     if market_id_tuple not in self.pending_market_summaries:
                         self.pending_market_summaries[market_id_tuple] = []
                     self.pending_market_summaries[market_id_tuple].append(resolved_info)
-                    
                     positions_to_remove_indices.append(i)
             
-            # Remove resolved positions from self.open_positions (iterate in reverse to avoid index issues)
             for index in sorted(positions_to_remove_indices, reverse=True):
                 del self.open_positions[index]
 
-            # Check for markets that are now fully resolved and print their summary
-            # This logic is moved to the end of run_strategy to ensure all positions for all markets are processed.
-
-            # Get all data points for the current timestamp
             current_data_points = self.market_data[self.market_data['Timestamp'] == current_timestamp]
 
             for _, row in current_data_points.iterrows():
                 market_id_tuple = (row['TargetTime'], row['Expiration'])
-                
                 trade_decision = strategy_instance.decide(row, self.capital)
                 
                 if trade_decision:
-                    side, quantity, entry_price = trade_decision
-                    cost = quantity * entry_price
+                    market_id_formatted = f"({market_id_tuple[0].strftime('%Y-%m-%d %H:%M:%S')}, {market_id_tuple[1].strftime('%Y-%m-%d %H:%M:%S')})"
+                    
+                    if len(trade_decision) == 4 and trade_decision[0] == 'Arbitrage':
+                        _, quantity, up_price, down_price = trade_decision
+                        cost = quantity * (up_price + down_price)
 
-                    if self.capital >= cost:
+                        if self.capital >= cost:
+                            portfolio = strategy_instance._get_or_init_portfolio(market_id_tuple)
+                            print(f"[{current_timestamp}] STRATEGY: Executing Arbitrage Pair Trade in market {market_id_formatted}.")
+                            print(f"  - Reason: Profitable pair price found ({up_price:.2f} + {down_price:.2f} = {up_price+down_price:.2f}) < {strategy_instance.SAFETY_MARGIN_M}.")
+                            print(f"  - State: Portfolio=({portfolio['qty_yes']}, {portfolio['qty_no']}), Capital=${self.capital:.2f}")
+                            print(f"  - Trade: BUY {quantity} pairs (Up at ${up_price:.2f}, Down at ${down_price:.2f})\n")
 
-                        self.capital -= cost
+                            self.capital -= cost
+                            if hasattr(strategy_instance, 'update_portfolio'):
+                                strategy_instance.update_portfolio(market_id_tuple, 'Up', quantity, up_price)
+                                strategy_instance.update_portfolio(market_id_tuple, 'Down', quantity, down_price)
 
-                        if hasattr(strategy_instance, 'update_portfolio'):
-                            strategy_instance.update_portfolio(market_id_tuple, side, quantity, entry_price)
+                            self.open_positions.append({'market_id': market_id_tuple, 'side': 'Up', 'quantity': quantity, 'entry_price': up_price, 'expiration': row['Expiration']})
+                            self.transactions.append({'Timestamp': current_timestamp, 'Type': 'Buy', 'MarketID': market_id_tuple, 'Side': 'Up', 'Quantity': quantity, 'EntryPrice': up_price, 'Value': quantity * up_price, 'PnL': -quantity * up_price})
+                            
+                            self.open_positions.append({'market_id': market_id_tuple, 'side': 'Down', 'quantity': quantity, 'entry_price': down_price, 'expiration': row['Expiration']})
+                            self.transactions.append({'Timestamp': current_timestamp, 'Type': 'Buy', 'MarketID': market_id_tuple, 'Side': 'Down', 'Quantity': quantity, 'EntryPrice': down_price, 'Value': quantity * down_price, 'PnL': -quantity * down_price})
 
-                        self.open_positions.append({ # Append to list
-                            'market_id': market_id_tuple, # Store market_id explicitly
-                            'side': side,
-                            'quantity': quantity,
-                            'entry_price': entry_price,
-                            'expiration': row['Expiration']
-                        })
-                        self.transactions.append({
-                            'Timestamp': current_timestamp,
-                            'Type': 'Buy',
-                            'MarketID': market_id_tuple,
-                            'Side': side,
-                            'Quantity': quantity,
-                            'EntryPrice': entry_price,
-                            'Value': cost,
-                            'PnL': -cost # Initial PnL is the cost of investment
-                        })
-                        #print(f"[{current_timestamp.strftime('%Y-%m-%d %H:%M:%S')}] BOUGHT {quantity} shares of {side} in market ({market_id_tuple[0].strftime('%Y-%m-%d %H:%M:%S')}, {market_id_tuple[1].strftime('%Y-%m-%d %H:%M:%S')}) at ${entry_price:.2f}. Capital: ${self.capital:.2f}")
-                    else:
-                        print(f"[{current_timestamp.strftime('%Y-%m-%d %H:%M:%S')}] Insufficient capital to buy {quantity} shares of {side} in market ({market_id_tuple[0].strftime('%Y-%m-%d %H:%M:%S')}, {market_id_tuple[1].strftime('%Y-%m-%d %H:%M:%S')}) (Cost: ${cost:.2f}, Capital: ${self.capital:.2f})")
+                    elif len(trade_decision) == 3:
+                        side, quantity, entry_price = trade_decision
+                        cost = quantity * entry_price
+
+                        if self.capital >= cost:
+                            portfolio = strategy_instance._get_or_init_portfolio(market_id_tuple)
+                            quantity_delta = abs(portfolio['qty_yes'] - portfolio['qty_no'])
+                            print(f"[{current_timestamp}] STRATEGY: Executing Rebalancing Trade in market {market_id_formatted}.")
+                            print(f"  - Reason: Portfolio imbalanced by {quantity_delta} shares.")
+                            print(f"  - State: Portfolio=({portfolio['qty_yes']}, {portfolio['qty_no']}), Capital=${self.capital:.2f}")
+                            print(f"  - Trade: BUY {quantity} shares of '{side}' at ${entry_price:.2f}\n")
+
+                            self.capital -= cost
+                            if hasattr(strategy_instance, 'update_portfolio'):
+                                strategy_instance.update_portfolio(market_id_tuple, side, quantity, entry_price)
+
+                            self.open_positions.append({'market_id': market_id_tuple, 'side': side, 'quantity': quantity, 'entry_price': entry_price, 'expiration': row['Expiration']})
+                            self.transactions.append({'Timestamp': current_timestamp, 'Type': 'Buy', 'MarketID': market_id_tuple, 'Side': side, 'Quantity': quantity, 'EntryPrice': entry_price, 'Value': cost, 'PnL': -cost})
         
-        # After iterating through all timestamps, resolve any remaining open positions
-        # This will collect any positions that expired after the last recorded current_timestamp
-        # or were still open at the end of the backtest data.
-        for position in self.open_positions[:]: # Use a copy to allow modification
+        for position in self.open_positions[:]:
             market_id_tuple = position['market_id']
-            resolved_info = self._resolve_single_position(market_id_tuple, position, current_timestamp) # Use the last current_timestamp or the position's expiration
-            
+            resolved_info = self._resolve_single_position(market_id_tuple, position, current_timestamp)
             if market_id_tuple not in self.pending_market_summaries:
                 self.pending_market_summaries[market_id_tuple] = []
             self.pending_market_summaries[market_id_tuple].append(resolved_info)
-            self.open_positions.remove(position) # Remove from original list
+            self.open_positions.remove(position)
 
-        # Print summaries for any remaining markets in pending_market_summaries
         for market_id_tuple, resolutions_data in self.pending_market_summaries.items():
             self._print_market_summary(market_id_tuple, resolutions_data)
-        self.pending_market_summaries.clear() # Clear after all summaries are printed
+        self.pending_market_summaries.clear()
 
     def generate_report(self):
         print("\n--- Backtest Report ---")
@@ -368,7 +307,7 @@ class Backtester:
         for t in resolution_trades:
             if t['PnL'] > 0:
                 winning_trades_count += 1
-            else: # PnL <= 0, includes exact 0 and negative PnL. "Neither" implies loss of investment.
+            else:
                 losing_trades_count += 1
         
         print(f"Number of Buy Trades: {len(buy_trades)}")
@@ -379,42 +318,7 @@ class Backtester:
         print(f"Number of Winning Trades: {winning_trades_count}")
         print(f"Number of Losing Trades: {losing_trades_count}")
 
-        # Optional: Print transaction history
-        # print("\n--- Transaction History ---")
-        # for t in self.transactions:
-        #     print(t)
-
-        # --- DEBUGGING IMBALANCED MARKETS ---
-        print("\n--- Imbalanced Market Analysis ---")
-        market_shares = {}
-
-        for trade in buy_trades:
-            market_id = trade['MarketID']
-            side = trade['Side']
-            quantity = trade['Quantity']
-
-            if market_id not in market_shares:
-                market_shares[market_id] = {'Up': 0, 'Down': 0}
-            
-            market_shares[market_id][side] += quantity
-
-        imbalanced_count = 0
-        for market_id, shares in market_shares.items():
-            if shares['Up'] != shares['Down']:
-                imbalanced_count += 1
-                market_id_formatted = f"({market_id[0].strftime('%Y-%m-%d %H:%M:%S')}, {market_id[1].strftime('%Y-%m-%d %H:%M:%S')})"
-                print(f"Market {market_id_formatted} is imbalanced: Up={shares['Up']}, Down={shares['Down']}")
-        
-        if imbalanced_count == 0:
-            print("All traded markets are balanced.")
-        print("------------------------------------")
-
 if __name__ == "__main__":
-    # The user has indicated that data_logger.py is running in a separate process
-    # and market_data.csv already contains data.
-    # Therefore, we skip automatic data generation.
-
-
     backtester = Backtester(initial_capital=INITIAL_CAPITAL)
     
     try:
@@ -423,10 +327,6 @@ if __name__ == "__main__":
         print(e)
         exit()
 
-    strategy = RebalancingStrategy() # Use the new strategy
+    strategy = RebalancingStrategy()
     backtester.run_strategy(strategy)
     backtester.generate_report()
-
-    # Clean up generated data file (optional)
-    # os.remove(DATA_FILE)
-    # print(f"Removed {DATA_FILE}")
