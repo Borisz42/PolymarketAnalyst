@@ -1,7 +1,6 @@
 import requests
 import time
 import datetime
-import pytz
 from get_current_markets import get_current_market_urls
 
 # Configuration
@@ -9,8 +8,12 @@ POLYMARKET_API_URL = "https://gamma-api.polymarket.com/events"
 CLOB_API_URL = "https://clob.polymarket.com/book"
 
 def get_clob_price(token_id):
+    """
+    Fetch order book data for a token.
+    Returns dict with bid, ask, mid, spread, and liquidity depth.
+    """
     try:
-        response = requests.get(CLOB_API_URL, params={"token_id": token_id})
+        response = requests.get(CLOB_API_URL, params={"token_id": token_id}, timeout=10)
         response.raise_for_status()
         data = response.json()
         
@@ -20,23 +23,47 @@ def get_clob_price(token_id):
         
         best_bid = 0.0
         best_ask = 0.0
+        bid_liquidity = 0.0
+        ask_liquidity = 0.0
         
         if bids:
             # Bids: We want the HIGHEST price someone is willing to pay
             best_bid = max(float(b['price']) for b in bids)
+            # Calculate total liquidity (sum of top 5 levels)
+            bid_liquidity = sum(float(b['size']) for b in sorted(bids, key=lambda x: float(x['price']), reverse=True)[:5])
             
         if asks:
             # Asks: We want the LOWEST price someone is willing to sell for
             best_ask = min(float(a['price']) for a in asks)
+            # Calculate total liquidity (sum of top 5 levels)
+            ask_liquidity = sum(float(a['size']) for a in sorted(asks, key=lambda x: float(x['price']))[:5])
+        
+        # Calculate mid price and spread
+        mid_price = 0.0
+        spread = 0.0
+        if best_bid > 0 and best_ask > 0:
+            mid_price = (best_bid + best_ask) / 2.0
+            spread = best_ask - best_bid
             
-        return best_ask if best_ask > 0 else 0.0 # Return Ask as the "Buy" price
+        return {
+            'best_bid': best_bid,
+            'best_ask': best_ask,
+            'mid_price': mid_price,
+            'spread': spread,
+            'bid_liquidity': bid_liquidity,
+            'ask_liquidity': ask_liquidity
+        }
     except Exception as e:
         return None
 
 def get_polymarket_data(slug):
+    """
+    Fetch comprehensive market data including order book depth.
+    Returns dict with prices and order book data for each outcome.
+    """
     try:
         # 1. Get Event Details to find Token IDs
-        response = requests.get(POLYMARKET_API_URL, params={"slug": slug})
+        response = requests.get(POLYMARKET_API_URL, params={"slug": slug}, timeout=10)
         response.raise_for_status()
         data = response.json()
         
@@ -58,19 +85,25 @@ def get_polymarket_data(slug):
         if len(clob_token_ids) != 2:
             return None, "Unexpected number of tokens"
             
-        # 2. Fetch Price for each Token from CLOB
-        prices = {}
-        # Assuming order is [Up, Down] or matches outcomes
-        # Usually outcomes are ["Up", "Down"] and clobTokenIds correspond.
+        # 2. Fetch Order Book Data for each Token from CLOB
+        order_books = {}
         
         for outcome, token_id in zip(outcomes, clob_token_ids):
-            price = get_clob_price(token_id)
-            if price is not None:
-                prices[outcome] = price
+            book_data = get_clob_price(token_id)
+            if book_data is not None:
+                order_books[outcome] = book_data
             else:
-                prices[outcome] = 0.0
+                # Return default values if fetch fails
+                order_books[outcome] = {
+                    'best_bid': 0.0,
+                    'best_ask': 0.0,
+                    'mid_price': 0.0,
+                    'spread': 0.0,
+                    'bid_liquidity': 0.0,
+                    'ask_liquidity': 0.0
+                }
             
-        return prices, None
+        return order_books, None
     except Exception as e:
         return None, str(e)
 
@@ -79,6 +112,7 @@ def get_polymarket_data(slug):
 def fetch_polymarket_data_struct():
     """
     Fetches current Polymarket data and returns a structured dictionary.
+    Returns comprehensive order book data including bids, asks, spreads, and liquidity.
     """
     try:
         # Get current market info
@@ -91,13 +125,13 @@ def fetch_polymarket_data_struct():
         slug = polymarket_url.split("/")[-1]
         
         # Fetch Data
-        poly_prices, poly_err = get_polymarket_data(slug)
+        order_books, poly_err = get_polymarket_data(slug)
         
         if poly_err:
             return None, f"Polymarket Error: {poly_err}"
             
         return {
-            "prices": poly_prices, # {'Up': 0.xx, 'Down': 0.xx}
+            "order_books": order_books,  # {'Up': {best_bid, best_ask, ...}, 'Down': {...}}
             "slug": slug,
             "target_time_utc": target_time_utc,
             "expiration_time_utc": expiration_time_utc
@@ -116,9 +150,13 @@ def main():
     print(f"Target Time (UTC): {data['target_time_utc']}")
     print("-" * 50)
     
-    up_price = data['prices'].get("Up", 0)
-    down_price = data['prices'].get("Down", 0)
-    print(f"BUY: UP ${up_price:.3f} & DOWN ${down_price:.3f}")
+    up_book = data['order_books'].get("Up", {})
+    down_book = data['order_books'].get("Down", {})
+    
+    print(f"UP   - Bid: ${up_book.get('best_bid', 0):.3f} | Ask: ${up_book.get('best_ask', 0):.3f} | Mid: ${up_book.get('mid_price', 0):.3f} | Spread: ${up_book.get('spread', 0):.4f}")
+    print(f"DOWN - Bid: ${down_book.get('best_bid', 0):.3f} | Ask: ${down_book.get('best_ask', 0):.3f} | Mid: ${down_book.get('mid_price', 0):.3f} | Spread: ${down_book.get('spread', 0):.4f}")
+    print(f"UP Liquidity   - Bid: {up_book.get('bid_liquidity', 0):.1f} | Ask: {up_book.get('ask_liquidity', 0):.1f}")
+    print(f"DOWN Liquidity - Bid: {down_book.get('bid_liquidity', 0):.1f} | Ask: {down_book.get('ask_liquidity', 0):.1f}")
 
 if __name__ == "__main__":
     main()

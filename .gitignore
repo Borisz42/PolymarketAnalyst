@@ -17,5 +17,4 @@ __pycache__/
 # Project specific
 market_urls_*.txt
 debug_polymarket.py
-market_data*.csv
 data_logger_errors.log

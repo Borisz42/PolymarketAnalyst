@@ -9,6 +9,57 @@ Recent updates have brought significant improvements to both the backtesting cap
 - **Automated Market Detection**: Automatically finds the currently active 15-minute BTC market
 - **Real-time Data Logging**: Continuously fetches and logs market data.
 - **CSV Storage**: Historical data stored in `market_data.csv` for analysis, with optional daily rotation.
+- **Order Book Depth**: Captures comprehensive order book data including bid/ask prices, spreads, and liquidity
+
+### Market Data Format
+
+The enhanced data logger captures comprehensive order book data in `market_data.csv` with 14 columns:
+
+#### Column Descriptions
+
+| Column | Description | Example | Notes |
+|--------|-------------|---------|-------|
+| `Timestamp` | When the data was logged | `2025-12-25 17:00:21` | Local time |
+| `TargetTime` | Market's target time (start of 15-min window) | `2025-12-25 16:00:00` | UTC |
+| `Expiration` | Market expiration time | `2025-12-25 16:15:00` | UTC |
+| `UpBid` | Best bid price for UP contracts | `0.57` | Highest price buyers offer |
+| `UpAsk` | Best ask price for UP contracts | `0.58` | Lowest price sellers offer |
+| `UpMid` | Mid-market price for UP | `0.575` | (UpBid + UpAsk) / 2 |
+| `UpSpread` | Bid-ask spread for UP | `0.01` | UpAsk - UpBid |
+| `UpBidLiquidity` | Total UP bid liquidity (top 5 levels) | `1224.11` | Shares available to buy |
+| `UpAskLiquidity` | Total UP ask liquidity (top 5 levels) | `1357.94` | Shares available to sell |
+| `DownBid` | Best bid price for DOWN contracts | `0.4` | Highest price buyers offer |
+| `DownAsk` | Best ask price for DOWN contracts | `0.41` | Lowest price sellers offer |
+| `DownMid` | Mid-market price for DOWN | `0.405` | (DownBid + DownAsk) / 2 |
+| `DownSpread` | Bid-ask spread for DOWN | `0.01` | DownAsk - DownBid |
+| `DownBidLiquidity` | Total DOWN bid liquidity (top 5 levels) | `1092.92` | Shares available to buy |
+| `DownAskLiquidity` | Total DOWN ask liquidity (top 5 levels) | `1260.11` | Shares available to sell |
+
+#### Understanding the Data
+
+**Prices:**
+- All prices are in USD and represent the cost per share
+- UP and DOWN prices should theoretically sum to ~$1.00 (e.g., 0.58 + 0.41 = 0.99)
+- The difference from $1.00 represents the market's profit margin
+
+**Spreads:**
+- Typically 0.01 (1 cent) but can vary from 0.01 to 0.03
+- UpSpread and DownSpread are usually similar but can differ based on market conditions
+- Tighter spreads indicate more liquid markets
+- Example: Row 3 shows UpSpread=0.01 but DownSpread=0.03 (different liquidity on each side)
+
+**Liquidity:**
+- Measured in number of shares available at top 5 price levels
+- Higher liquidity = easier to enter/exit positions without slippage
+- Liquidity can vary significantly between UP and DOWN sides
+- Example: Row 7 shows UpAskLiquidity=2477.96 but DownAskLiquidity=924.36
+
+**Why Both UpSpread and DownSpread?**
+While spreads are often similar (both 0.01), they can differ when:
+- One side has more liquidity than the other
+- Market makers adjust pricing based on directional flow
+- Volatility affects one side more than the other
+Keeping both provides more accurate data for backtesting and analysis.
 
 ### Interactive Dashboard
 - **Live Auto-Refresh**: Automatically updates periodically (every second) to ensure the latest data is displayed.
@@ -25,30 +76,80 @@ Recent updates have brought significant improvements to both the backtesting cap
   - Scroll zoom and range slider
 
 ### Backtester
-A script (`backtester.py`) that simulates the execution of a trading strategy on historical Polymarket data.
 
-#### Strategy
-The backtester now employs the `DerivativeMovingAverageStrategy`. This strategy analyzes the price movement by calculating a moving average of price derivatives.
+An advanced backtesting script (`backtester.py`) that simulates trading strategies on historical Polymarket data with comprehensive risk management and constraint checking.
 
-- It tracks the `DERIVATIVE_MA_PERIOD` (e.g., 10 periods) moving average of price changes.
-- If the derivative moving average for 'UpPrice' exceeds a `DERIVATIVE_THRESHOLD` (e.g., 0.005), it suggests an upward trend, and the strategy buys 'Up' shares.
-- If the derivative moving average for 'DownPrice' falls below `-DERIVATIVE_THRESHOLD`, it suggests a downward trend, and the strategy buys 'Down' shares.
-- Trades are considered on every `N_TICK_POINT`-th data point for a given market, allowing for less frequent trading.
-- The backtester supports multiple open positions for the same market ID.
+#### Strategy: RebalancingStrategy
 
-#### Winning Condition
-A direction (Up or Down) is considered to have "won" if its own price is exactly $0 at the last available data point before the market's expiration date. Each share of the winning side pays out $1. If neither side's price reaches exactly $0, the trade is considered a loss for the position held.
+The backtester employs a sophisticated **RebalancingStrategy** that focuses on accumulating paired positions (buying both UP and DOWN) when profitable opportunities arise, while maintaining balanced positions.
+
+**Core Logic:**
+- **Paired Position Accumulation**: Buys both UP and DOWN shares when the combined cost is below the safety margin (0.98)
+- **Position Rebalancing**: Automatically rebalances when positions become imbalanced
+- **Locked Profit Tracking**: Calculates guaranteed profit from paired positions
+
+**Advanced Features:**
+
+1. **State Calculation** (from accumulator.py):
+   - Tracks average entry prices for UP and DOWN positions
+   - Calculates pair cost (avg_yes + avg_no)
+   - Monitors position delta (imbalance between UP and DOWN)
+   - Computes locked profit from paired positions
+
+2. **Constraint Checking**:
+   - **Liquidity Constraint**: Ensures opposite side has 3x the required liquidity before trading
+   - **Delta Constraint**: Prevents position imbalance from exceeding 50 shares
+   - **Safety Margin**: Ensures pair cost stays below 0.98
+
+3. **Risk Management** (from risk_engine.py):
+   - Tracks maximum drawdown throughout the backtest
+   - Monitors peak capital and current capital
+   - Logs risk events (insufficient capital, constraint violations)
+   - Calculates unrealized P&L using mid-market prices
 
 #### Configuration
-The backtester's behavior can be easily adjusted by modifying the following global variables at the beginning of `backtester.py`:
-- `INITIAL_CAPITAL`: The starting capital for the simulation (default: $1000.0).
-- `SHARE_SIZE`: The number of shares to buy in each trade (default: 2).
-- `DERIVATIVE_MA_PERIOD`: The number of periods for calculating the moving average of the derivative (default: 10).
-- `DERIVATIVE_THRESHOLD`: A small threshold (e.g., 0.005) used to filter out minor fluctuations in the derivative moving average.
-- `N_TICK_POINT`: Determines trading frequency, e.g., trade on every N-th data point (default: 1).
 
-#### Consolidated Market Summaries
-Upon market resolution, the backtester now provides a single, consolidated summary for each market. This summary includes the total PnL, total shares traded for 'Up' and 'Down' sides, and their average entry prices, offering a clear overview of market performance rather than individual position resolutions.
+Adjust strategy parameters in `backtester.py`:
+
+```python
+INITIAL_CAPITAL = 1000.0              # Starting capital
+SAFETY_MARGIN_M = 0.98                # Max pair cost (0.98 = 2% profit margin)
+MAX_TRADE_SIZE = 500                  # Maximum position size per market
+MIN_BALANCE_QTY = 1                   # Minimum imbalance to trigger rebalancing
+MAX_UNHEDGED_DELTA = 50               # Maximum position imbalance allowed
+MIN_LIQUIDITY_MULTIPLIER = 3.0        # Required liquidity multiplier (3x)
+STOP_LOSS_PERCENT = 2.0               # Stop loss threshold (for future use)
+```
+
+#### Enhanced Reporting
+
+The backtester provides comprehensive reports including:
+- **Performance Metrics**: Total P&L, ROI%, final capital
+- **Risk Metrics**: Maximum drawdown percentage
+- **Trade Statistics**: Win rate, number of markets traded
+- **Position Analysis**: Balanced vs imbalanced markets
+- **Risk Events**: Constraint violations, capital shortfalls
+
+**Example Output:**
+```
+--- Backtest Report ---
+Initial Capital: $1000.00
+Final Capital:   $1050.00
+Total PnL:       $50.00 (+5.00%)
+Max Drawdown:    2.34%
+Number of Markets Won: 12
+--- Risk Events ---
+Total Risk Events: 3
+  Insufficient Capital: 2
+  Liquidity Constraint: 1
+```
+
+#### Market Resolution
+
+Markets are resolved using mid-market prices for fairness:
+- Uses `UpMid` and `DownMid` from the enhanced CSV data
+- Winning side determined by which price is closer to 0
+- Each winning share pays out $1.00
 
 
 #### How to Run Data fetcher and Dashboard
@@ -87,9 +188,12 @@ This script will analyze historical data for arbitrage opportunities and report 
 
 ### Dashboard Tips
 - Enable **Auto-refresh** to see updates in real-time as data is logged
+- Watch the **Pair Cost chart** (top panel) - green areas show trading opportunities
 - Use **Zoom Last 15m** to track the most recent market activity
-- Hover over the charts to see exact values with the unified crosshair
-- The charts are linked - zooming one automatically zooms the other
+- Monitor the **Opportunity Indicator** for real-time trading signals
+- Check **Liquidity Depth** before planning large trades
+- Hover over charts to see exact values with the unified crosshair
+- All charts are linked - zooming one automatically zooms all others
 
 ## How It Works
 
