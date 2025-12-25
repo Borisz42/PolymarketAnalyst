@@ -109,6 +109,9 @@ def writer_thread():
             pass
         
         if rows_to_write:
+            # Sort rows by timestamp (index 0) to ensure strictly ascending order
+            rows_to_write.sort(key=lambda x: x[0])
+            
             try:
                 with open(DATA_FILE, mode='a', newline='') as file:
                     writer = csv.writer(file)

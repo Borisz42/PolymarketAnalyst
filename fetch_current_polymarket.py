@@ -7,12 +7,20 @@ from get_current_markets import get_current_market_urls
 POLYMARKET_API_URL = "https://gamma-api.polymarket.com/events"
 CLOB_API_URL = "https://clob.polymarket.com/book"
 
+# Global cache to store token IDs for the current market slug
+_market_cache = {
+    "slug": None,
+    "clob_token_ids": None,
+    "outcomes": None
+}
+
 def get_clob_price(token_id):
     """
     Fetch order book data for a token.
     Returns dict with bid, ask, mid, spread, and liquidity depth.
     """
     try:
+        #t_start = time.time()
         response = requests.get(CLOB_API_URL, params={"token_id": token_id}, timeout=10)
         response.raise_for_status()
         data = response.json()
@@ -45,6 +53,7 @@ def get_clob_price(token_id):
             mid_price = (best_bid + best_ask) / 2.0
             spread = best_ask - best_bid
             
+        #print(f"    [Time] CLOB {token_id}: {time.time() - t_start:.3f}s")
         return {
             'best_bid': best_bid,
             'best_ask': best_ask,
@@ -61,29 +70,46 @@ def get_polymarket_data(slug):
     Fetch comprehensive market data including order book depth.
     Returns dict with prices and order book data for each outcome.
     """
+    global _market_cache
     try:
-        # 1. Get Event Details to find Token IDs
-        response = requests.get(POLYMARKET_API_URL, params={"slug": slug}, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-        
-        if not data:
-            return None, "Event not found"
+        clob_token_ids = []
+        outcomes = []
 
-        event = data[0]
-        markets = event.get("markets", [])
-        if not markets:
-            return None, "Markets not found in event"
+        # Check if we have cached data for this slug
+        if _market_cache["slug"] == slug:
+            clob_token_ids = _market_cache["clob_token_ids"]
+            outcomes = _market_cache["outcomes"]
+        else:
+            # 1. Get Event Details to find Token IDs
+            t_start = time.time()
+            response = requests.get(POLYMARKET_API_URL, params={"slug": slug}, timeout=10)
+            response.raise_for_status()
+            data = response.json()
             
-        market = markets[0]
-        
-        # Get Token IDs
-        # clobTokenIds is a list of strings
-        clob_token_ids = eval(market.get("clobTokenIds", "[]"))
-        outcomes = eval(market.get("outcomes", "[]"))
-        
-        if len(clob_token_ids) != 2:
-            return None, "Unexpected number of tokens"
+            if not data:
+                return None, "Event not found"
+
+            event = data[0]
+            markets = event.get("markets", [])
+            if not markets:
+                return None, "Markets not found in event"
+                
+            market = markets[0]
+            
+            # Get Token IDs
+            # clobTokenIds is a list of strings
+            clob_token_ids = eval(market.get("clobTokenIds", "[]"))
+            outcomes = eval(market.get("outcomes", "[]"))
+            
+            if len(clob_token_ids) != 2:
+                return None, "Unexpected number of tokens"
+                
+            print(f"   [Time] Gamma API {slug}: {time.time() - t_start:.3f}s")
+            
+            # Update cache
+            _market_cache["slug"] = slug
+            _market_cache["clob_token_ids"] = clob_token_ids
+            _market_cache["outcomes"] = outcomes
             
         # 2. Fetch Order Book Data for each Token from CLOB
         order_books = {}
