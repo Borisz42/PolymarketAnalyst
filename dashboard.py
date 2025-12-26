@@ -38,7 +38,26 @@ if df is not None and not df.empty:
     # Calculate derived metrics for strategy analysis
     df['PairCost'] = df['UpAsk'] + df['DownAsk']  # Cost to buy both sides
     df['SpreadTotal'] = df['UpSpread'] + df['DownSpread']  # Total market spread
-    df['LiquidityImbalance'] = (df['UpAskLiquidity'] - df['DownAskLiquidity']) / (df['UpAskLiquidity'] + df['DownAskLiquidity'])
+    def calculate_imbalance(row):
+        up_liq = row['UpAskLiquidity']
+        down_liq = row['DownAskLiquidity']
+
+        if up_liq > down_liq:
+            if down_liq > 0:
+                imbalance = up_liq / down_liq
+            else:
+                imbalance = 10
+        elif down_liq > up_liq:
+            if up_liq > 0:
+                imbalance = - (down_liq / up_liq)
+            else:
+                imbalance = -10
+        else: # up_liq == down_liq
+            imbalance = 0
+
+        return max(-10, min(10, imbalance))
+
+    df['LiquidityImbalance'] = df.apply(calculate_imbalance, axis=1)
 
     # Replace 0 values with NaN for plotting purposes, as 0 ask/liquidity means no data for that side
     df.loc[df['UpAsk'] == 0, 'UpAsk'] = np.nan
@@ -91,15 +110,16 @@ if df is not None and not df.empty:
     
     # Create 3-panel chart
     fig = make_subplots(
-        rows=3, cols=1, 
+        rows=4, cols=1, 
         shared_xaxes=True,
         vertical_spacing=0.05,
         subplot_titles=(
             "💰 Pair Cost (KEY FOR STRATEGY)",
             "📉 Ask Prices (UP vs DOWN)", 
-            "💧 Liquidity Depth"
+            "💧 Liquidity Depth",
+            "⚖️ Liquidity Imbalance"
         ),
-        row_heights=[0.4, 0.3, 0.3]
+        row_heights=[0.3, 0.25, 0.25, 0.2]
     )
 
     # === CHART 1: PAIR COST (Most Important for Strategy) ===
@@ -154,15 +174,23 @@ if df is not None and not df.empty:
         mode='lines'
     ), row=3, col=1)
 
+    # === CHART 4: LIQUIDITY IMBALANCE ===
+    fig.add_trace(go.Bar(
+        x=df_chart['Timestamp'],
+        y=df_chart['LiquidityImbalance'],
+        name="Liquidity Imbalance",
+        marker_color=np.where(df_chart['LiquidityImbalance'] > 0, '#4ECDC4', '#FF6B9D')
+    ), row=4, col=1)
+
     # Add vertical lines for market transitions
     transitions = df.loc[df['TargetTime'].shift() != df['TargetTime'], 'Timestamp'].iloc[1:]
     for t in transitions:
-        for row in range(1, 4):
+        for row in range(1, 5):
             fig.add_vline(x=t, line_width=1, line_dash="dot", line_color="gray", row=row, col=1)
 
     # Update Layout
     fig.update_layout(
-        height=900,
+        height=1100,
         hovermode="x unified",
         showlegend=True,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
@@ -172,11 +200,12 @@ if df is not None and not df.empty:
     fig.update_yaxes(title_text="USD", row=1, col=1)
     fig.update_yaxes(title_text="Price", range=[0, 1], row=2, col=1)
     fig.update_yaxes(title_text="Shares", row=3, col=1)
-    fig.update_xaxes(title_text="Time", row=3, col=1)
+    fig.update_yaxes(title_text="Imbalance Ratio", row=4, col=1)
+    fig.update_xaxes(title_text="Time", row=4, col=1)
 
     # Apply zoom if set
     if current_range:
-        for row in range(1, 4):
+        for row in range(1, 5):
             fig.update_xaxes(range=current_range, row=row, col=1)
 
     # Enable crosshair
@@ -187,7 +216,7 @@ if df is not None and not df.empty:
     # === DATA TABLE ===
     with st.expander("📋 View Recent Data"):
         display_cols = ['Timestamp', 'UpAsk', 'DownAsk', 'PairCost',
-                       'SpreadTotal', 'UpAskLiquidity', 'DownAskLiquidity']
+                       'SpreadTotal', 'UpAskLiquidity', 'DownAskLiquidity', 'LiquidityImbalance']
         st.dataframe(df[display_cols].tail(20).sort_values('Timestamp', ascending=False),
                     use_container_width=True)
     

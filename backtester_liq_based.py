@@ -12,13 +12,16 @@ INITIAL_CAPITAL = 1000.0
 class RebalancingStrategy:
     def __init__(self):
         # Parameters from plan
-        self.SAFETY_MARGIN_M = 0.99
+        self.SAFETY_MARGIN_M = 0.98
         self.MAX_TRADE_SIZE = 500
         self.MIN_BALANCE_QTY = 1
+        self.MAX_PRICE_FOR_INBALANCE = 0.65
+        self.MIN_LIQ_INBALANCE = 0.01
+        self.MAX_LIQ_INBALANCE = 0.999
         
         # Risk management parameters (from risk_engine.py)
-        self.MAX_UNHEDGED_DELTA = 50  # Maximum position imbalance
-        self.MIN_LIQUIDITY_MULTIPLIER = 3.0  # Opposite side must have 3x liquidity
+        self.MAX_UNHEDGED_DELTA = 20  # Maximum position imbalance
+        self.MIN_LIQUIDITY_MULTIPLIER = 2.0  # Opposite side must have 3x liquidity
         self.STOP_LOSS_PERCENT = 2.0  # Stop loss at 2% loss
         
         # Portfolio state per market
@@ -118,6 +121,28 @@ class RebalancingStrategy:
 
         return new_combined_avg_p < self.SAFETY_MARGIN_M
 
+    def scan_opportunities(self, market_data_point):
+        up_price = market_data_point.get('UpAsk', 0)
+        down_price = market_data_point.get('DownAsk', 0)
+
+        if up_price > self.MAX_PRICE_FOR_INBALANCE or down_price > self.MAX_PRICE_FOR_INBALANCE:
+            return None
+
+        up_liq = market_data_point.get('UpAskLiquidity', 0)
+        down_liq = market_data_point.get('DownAskLiquidity', 0)
+        
+        total_liq = up_liq + down_liq
+        
+        if total_liq == 0:
+            return None
+
+        imbalance = 1 - (total_liq - abs(up_liq - down_liq)) / total_liq
+
+        if self.MIN_LIQ_INBALANCE <= imbalance < self.MAX_LIQ_INBALANCE:
+            return 'Up' if up_liq > down_liq else 'Down'
+            
+        return None
+
     def decide(self, market_data_point, current_capital):
         market_id = (market_data_point['TargetTime'], market_data_point['Expiration'])
         portfolio = self._get_or_init_portfolio(market_id)
@@ -134,10 +159,9 @@ class RebalancingStrategy:
             price_yes = market_data_point.get('UpAsk', 0)
             price_no = market_data_point.get('DownAsk', 0)
 
-            # Only increase position if buying a pair is profitable
-            if price_yes > 0 and price_no > 0 and (price_yes + price_no < self.SAFETY_MARGIN_M):
-                side_to_buy = 'Up'
-                price_to_buy = price_yes
+            side_to_buy = self.scan_opportunities(market_data_point)
+            if side_to_buy != None:
+                price_to_buy = price_yes if side_to_buy == 'Up' else price_no
                 
                 # Determine the max quantity we can possibly add
                 qty_to_try = self.MAX_TRADE_SIZE - qty_yes
