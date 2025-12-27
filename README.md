@@ -8,12 +8,12 @@ Recent updates have brought significant improvements to both the backtesting cap
 ### Data Collection
 - **Automated Market Detection**: Automatically finds the currently active 15-minute BTC market
 - **Real-time Data Logging**: Continuously fetches and logs market data.
-- **CSV Storage**: Historical data stored in `data/market_data.csv` for analysis, with optional daily rotation.
+- **CSV Storage**: Historical data stored in date-stamped CSV files in the `data/` directory (e.g., `data/market_data_YYYYMMDD.csv`).
 - **Order Book Depth**: Captures comprehensive order book data including bid/ask prices, spreads, and liquidity
 
 ### Market Data Format
 
-The enhanced data logger captures comprehensive order book data in `data/market_data.csv` with 14 columns:
+The enhanced data logger captures comprehensive order book data in date-stamped CSV files (e.g., `data/market_data_YYYYMMDD.csv`) with 14 columns:
 
 #### Column Descriptions
 
@@ -31,7 +31,7 @@ The enhanced data logger captures comprehensive order book data in `data/market_
 | `DownBid` | Best bid price for DOWN contracts | `0.4` | Highest price buyers offer |
 | `DownAsk` | Best ask price for DOWN contracts | `0.41` | Lowest price sellers offer |
 | `DownMid` | Mid-market price for DOWN | `0.405` | (DownBid + DownAsk) / 2 |
-| `DownSpread` | Bid-ask spread for DOWN | `0.01` | DownAsk - DownBid |
+| `DownSpread` | Bid-ask spread for DOWN | `0.01` | DownAsk - Bid |
 | `DownBidLiquidity` | Total DOWN bid liquidity (top 5 levels) | `1092.92` | Shares available to buy |
 | `DownAskLiquidity` | Total DOWN ask liquidity (top 5 levels) | `1260.11` | Shares available to sell |
 
@@ -90,41 +90,39 @@ The backtester employs a sophisticated **RebalancingStrategy** that focuses on a
 
 **Advanced Features:**
 
-1. **State Calculation** (from accumulator.py):
-   - Tracks average entry prices for UP and DOWN positions
-   - Calculates pair cost (avg_yes + avg_no)
-   - Monitors position delta (imbalance between UP and DOWN)
-   - Computes locked profit from paired positions
+1.  **State Calculation** (from accumulator.py):
+    - Tracks average entry prices for UP and DOWN positions
+    - Calculates pair cost (avg_yes + avg_no)
+    - Monitors position delta (imbalance between UP and DOWN)
+    - Computes locked profit from paired positions
 
-2. **Constraint Checking**:
-   - **Liquidity Constraint**: Ensures opposite side has 3x the required liquidity before trading
-   - **Delta Constraint**: Prevents position imbalance from exceeding 50 shares
-   - **Safety Margin**: Ensures pair cost stays below 0.98
+2.  **Constraint Checking**:
+    - **Liquidity Constraint**: Ensures opposite side has 3x the required liquidity before trading
+    - **Delta Constraint**: Prevents position imbalance from exceeding 50 shares
+    - **Safety Margin**: Ensures pair cost stays below 0.98
 
-3. **Risk Management** (from risk_engine.py):
-   - Tracks maximum drawdown throughout the backtest
-   - Monitors peak capital and current capital
-   - Logs risk events (insufficient capital, constraint violations)
-   - Calculates unrealized P&L using mid-market prices
+3.  **Risk Management** (from risk_engine.py):
+    - Tracks maximum drawdown throughout the backtest
+    - Monitors peak capital and current capital
+    - Logs risk events (insufficient capital, constraint violations)
+    - Calculates unrealized P&L using mid-market prices
 
 #### Configuration
 
-Adjust strategy parameters in `src/analysis/backtester.py`:
+Adjust strategy and analysis parameters in `src/config.py`:
 
 ```python
+# Set to 0 to use today's date for analysis, or a yyyymmdd integer (e.g., 20231225) for a specific day.
+ANALYSIS_DATE = 0
 INITIAL_CAPITAL = 1000.0              # Starting capital
-SAFETY_MARGIN_M = 0.98                # Max pair cost (0.98 = 2% profit margin)
-MAX_TRADE_SIZE = 500                  # Maximum position size per market
-MIN_BALANCE_QTY = 1                   # Minimum imbalance to trigger rebalancing
-MAX_UNHEDGED_DELTA = 50               # Maximum position imbalance allowed
-MIN_LIQUIDITY_MULTIPLIER = 3.0        # Required liquidity multiplier (3x)
-STOP_LOSS_PERCENT = 2.0               # Stop loss threshold (for future use)
+# ... other parameters
 ```
+To run the dashboard or backtesters on a specific day's data, simply change the `ANALYSIS_DATE` variable in the config file. The `data_logger.py` will always write to the current day's file, regardless of this setting.
 
 #### Enhanced Reporting
 
 The backtester provides comprehensive reports including:
-- **Performance Metrics**: Total P&L, ROI%, final capital
+- **Performance Metrics**: Total PnL, ROI%, final capital
 - **Risk Metrics**: Maximum drawdown percentage
 - **Trade Statistics**: Win rate, number of markets traded
 - **Position Analysis**: Balanced vs imbalanced markets
@@ -152,39 +150,38 @@ Markets are resolved using mid-market prices for fairness:
 - Each winning share pays out $1.00
 
 
-#### How to Run Data fetcher and Dashboard
+## How to Run
 
-**Step 1: Start the Data Logger**
+### Step 1: Start the Data Logger
+The data logger runs in the background to collect market data. It will always write to a file with the current date.
+
 Open a terminal and run from the root directory:
 ```bash
 python -m src.data_collection.data_logger
 ```
-This will continuously fetch market data every 10 seconds and save it to `data/market_data.csv`.
 
-**Step 2: Launch the Dashboard**
-Open a **new** terminal and run:
+### Step 2: Configure Your Analysis (Optional)
+Before running the dashboard or backtesters, you can choose which day's data to analyze by editing `src/config.py`:
+-   Leave `ANALYSIS_DATE = 0` to automatically find and use the **latest available** data file.
+-   Set `ANALYSIS_DATE = 20231225` (or any other `yyyymmdd` integer) to analyze a specific day's data.
+
+### Step 3: Run the Dashboard or Backtesters
+Open a **new** terminal for each command.
+
+**To Launch the Dashboard:**
 ```bash
 streamlit run src/dashboard/dashboard.py
 ```
-The dashboard will open in your browser at `http://localhost:8501`.
 
-#### How to Run backtester
-
-Ensure `data/market_data.csv` contains historical data (generated by running the data logger for a sufficient period). Then, execute the backtester:
+**To Run the Main Backtester:**
 ```bash
 python -m src.analysis.backtester
 ```
-The script will output a report including final capital, total P&L, and the number of winning and losing trades.
 
-### Slippage Backtester
-A new script (`src/analysis/slipp_backtester.py`) has been introduced to backtest strategies considering slippage. This backtester focuses on identifying and exploiting price discrepancies between different markets or contracts within Polymarket.
-
-#### How to Run Slippage Backtester
-Ensure `data/market_data.csv` contains historical data. Then, execute the slippage backtester:
+**To Run the Slippage-Aware Backtester:**
 ```bash
 python -m src.analysis.slipp_backtester
 ```
-This script will analyze historical data for arbitrage opportunities and report on potential profits.
 
 ### Dashboard Tips
 - Watch the **Pair Cost chart** (top panel) - green areas show trading opportunities
@@ -196,7 +193,7 @@ This script will analyze historical data for arbitrage opportunities and report 
 
 ## How It Works
 
-The system identifies the **Active Market** by finding the 15-minute interval that has started but not yet expired:
+The system identifies the **Active Market** by find a 15-minute interval that has started but not yet expired:
 
 - **Start Time**: Beginning of the 15-minute candle
 - **Expiration**: End of the 15-minute candle  
@@ -209,13 +206,14 @@ Contracts pay out based on whether the price at **Expiration** is higher ("Up") 
 ```
 PolymarketAnalyst/
 ├── data/
-│   └── market_data.csv          # Historical data (auto-generated)
+│   └── market_data_YYYYMMDD.csv # Historical data (auto-generated, date-stamped)
 ├── src/
 │   ├── analysis/
 │   │   ├── __init__.py
 │   │   ├── analyze_prices.py
 │   │   ├── backtester.py
 │   │   └── slipp_backtester.py
+│   ├── config.py                # Centralized configuration file
 │   ├── data_collection/
 │   │   ├── __init__.py
 │   │   ├── data_logger.py

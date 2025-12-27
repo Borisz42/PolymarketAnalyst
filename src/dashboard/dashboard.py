@@ -1,3 +1,4 @@
+import src.config as config
 import numpy as np
 import os
 import streamlit as st
@@ -8,7 +9,7 @@ import time
 import datetime
 
 
-DATA_FILE = "data/market_data.csv"
+DATA_FILE = config.get_analysis_filename()
 
 
 st.set_page_config(page_title="Polymarket BTC Monitor", layout="wide")

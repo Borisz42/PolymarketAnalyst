@@ -7,11 +7,9 @@ import queue
 from concurrent.futures import ThreadPoolExecutor
 from .fetch_current_polymarket import fetch_polymarket_data_struct
 
-DATA_FILE = "data/market_data.csv"
-FETCH_INTERVAL_SECONDS = 1
-WRITE_INTERVAL_SECONDS = 5
-MAX_WORKERS = 15
+import src.config as config
 
+DATA_FILE = config.get_logger_filename()
 # Thread-safe queue for buffering data
 data_queue = queue.Queue()
 
@@ -96,7 +94,7 @@ def writer_thread():
     """
     print("Writer thread started.")
     while True:
-        time.sleep(WRITE_INTERVAL_SECONDS)
+        time.sleep(config.WRITE_INTERVAL_SECONDS)
         
         rows_to_write = []
         try:
@@ -122,9 +120,9 @@ def writer_thread():
 
 def main():
     print("Starting Threaded Data Logger...")
-    print(f" - Fetch Interval: {FETCH_INTERVAL_SECONDS}s")
-    print(f" - Write Buffer: {WRITE_INTERVAL_SECONDS}s")
-    print(f" - Max Concurrent Requests: {MAX_WORKERS}")
+    print(f" - Fetch Interval: {config.FETCH_INTERVAL_SECONDS}s")
+    print(f" - Write Buffer: {config.WRITE_INTERVAL_SECONDS}s")
+    print(f" - Max Concurrent Requests: {config.MAX_WORKERS}")
     
     init_csv()
     
@@ -133,13 +131,13 @@ def main():
     w_thread.start()
     
     # Create a thread pool for fetch tasks, use manual shutdown control
-    executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
+    executor = ThreadPoolExecutor(max_workers=config.MAX_WORKERS)
     
     try:
         while True:
             # Submit a new fetch task
             executor.submit(fetch_worker)
-            time.sleep(FETCH_INTERVAL_SECONDS)
+            time.sleep(config.FETCH_INTERVAL_SECONDS)
     except KeyboardInterrupt:
         print("\nStopping logger...")
         # Cancel pending futures and don't wait for running ones

@@ -1,13 +1,14 @@
+import src.config as config
 import pandas as pd
 import datetime
 import os
 from collections import deque
 from decimal import Decimal
 
-DATA_FILE = "data/market_data.csv"
+DATA_FILE = config.get_analysis_filename()
 
 # Global Configuration Variables
-INITIAL_CAPITAL = 1000.0
+INITIAL_CAPITAL = config.INITIAL_CAPITAL
 
 class RebalancingStrategy:
     def __init__(self):
