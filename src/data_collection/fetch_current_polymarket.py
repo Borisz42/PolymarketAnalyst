@@ -1,7 +1,7 @@
 import requests
 import time
 import datetime
-from get_current_markets import get_current_market_urls
+from .get_current_markets import get_current_market_urls
 
 # Configuration
 POLYMARKET_API_URL = "https://gamma-api.polymarket.com/events"
