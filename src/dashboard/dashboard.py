@@ -8,9 +8,7 @@ import time
 import datetime
 
 
-# Get the directory of the current script
-SCRIPT_DIR = os.path.dirname(__file__)
-DATA_FILE = os.path.join(SCRIPT_DIR, "market_data.csv")
+DATA_FILE = "data/market_data.csv"
 
 
 st.set_page_config(page_title="Polymarket BTC Monitor", layout="wide")

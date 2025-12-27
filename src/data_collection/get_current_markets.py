@@ -1,6 +1,6 @@
 import datetime
 import pytz
-from find_new_market import generate_market_url as generate_polymarket_url
+from .find_new_market import generate_market_url as generate_polymarket_url
 
 def get_current_market_urls():
     """

@@ -4,7 +4,7 @@ import os
 from collections import deque
 from decimal import Decimal
 
-DATA_FILE = "market_data.csv"
+DATA_FILE = "data/market_data.csv"
 
 # Global Configuration Variables
 INITIAL_CAPITAL = 1000.0

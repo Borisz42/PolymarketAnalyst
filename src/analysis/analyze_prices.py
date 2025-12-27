@@ -1,6 +1,6 @@
 import csv
 
-def analyze_market_data(filename="market_data.csv"):
+def analyze_market_data(filename="data/market_data.csv"):
     count = 0
     sums_list = []
     

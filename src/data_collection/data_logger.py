@@ -5,9 +5,9 @@ import os
 import threading
 import queue
 from concurrent.futures import ThreadPoolExecutor
-from fetch_current_polymarket import fetch_polymarket_data_struct
+from .fetch_current_polymarket import get_active_btcusd_markets
 
-DATA_FILE = "market_data.csv"
+DATA_FILE = "data/market_data.csv"
 FETCH_INTERVAL_SECONDS = 1
 WRITE_INTERVAL_SECONDS = 5
 MAX_WORKERS = 15
