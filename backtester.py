@@ -270,8 +270,8 @@ class Backtester:
 
         winning_side = None
         # Use mid prices to determine winner
-        up_mid = last_dp.get('UpMid', last_dp.get('UpPrice', 0))
-        down_mid = last_dp.get('DownMid', last_dp.get('DownPrice', 0))
+        up_mid = last_dp.get('UpAsk', last_dp.get('UpPrice', 0))
+        down_mid = last_dp.get('DownAsk', last_dp.get('DownPrice', 0))
         
         if up_mid == 0:  # If Up price is 0, then Up wins
             winning_side = 'Up'

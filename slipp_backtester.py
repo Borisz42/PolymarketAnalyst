@@ -136,8 +136,8 @@ class RebalancingStrategy:
 
             # Only increase position if buying a pair is profitable
             if price_yes > 0 and price_no > 0 and (price_yes + price_no < self.SAFETY_MARGIN_M):
-                side_to_buy = 'Up'
-                price_to_buy = price_yes
+                side_to_buy = 'Up' if price_yes > price_no else 'Down'
+                price_to_buy = price_yes if side_to_buy == 'Up' else price_no
                 
                 # Determine the max quantity we can possibly add
                 qty_to_try = self.MAX_TRADE_SIZE - qty_yes
@@ -270,8 +270,8 @@ class Backtester:
 
         winning_side = None
         # Use mid prices to determine winner
-        up_mid = last_dp.get('UpMid', last_dp.get('UpPrice', 0))
-        down_mid = last_dp.get('DownMid', last_dp.get('DownPrice', 0))
+        up_mid = last_dp.get('UpAsk', last_dp.get('UpPrice', 0))
+        down_mid = last_dp.get('DownAsk', last_dp.get('DownPrice', 0))
         
         if up_mid == 0:  # If Up price is 0, then Up wins
             winning_side = 'Up'
