@@ -34,9 +34,8 @@ class Backtester:
         self.market_data = pd.read_csv(file_path)
         
         # Convert relevant columns to datetime objects
-        self.market_data['Timestamp'] = pd.to_datetime(self.market_data['Timestamp']).dt.tz_localize('UTC').dt.tz_convert('UTC')
-        self.market_data['TargetTime'] = pd.to_datetime(self.market_data['TargetTime']).dt.tz_localize('UTC').dt.tz_convert('UTC')
-        self.market_data['Expiration'] = pd.to_datetime(self.market_data['Expiration']).dt.tz_localize('UTC').dt.tz_convert('UTC')
+        for col in ['Timestamp', 'TargetTime', 'Expiration']:
+            self.market_data[col] = pd.to_datetime(self.market_data[col], utc=True)
         
         # Sort data by timestamp to ensure chronological processing
         self.market_data.sort_values(by='Timestamp', inplace=True)
@@ -170,6 +169,34 @@ class Backtester:
         if current_drawdown > self.max_drawdown:
             self.max_drawdown = current_drawdown
 
+    def _apply_slippage(self, current_timestamp, market_id_tuple, side, entry_price):
+        """Applies slippage to the entry price."""
+        if self.slippage_seconds <= 0:
+            return entry_price
+
+        slippage_timestamp = current_timestamp + pd.Timedelta(seconds=self.slippage_seconds)
+
+        # Find the first data point at or after the slippage_timestamp
+        future_data = self.market_data[
+            (self.market_data['Timestamp'] >= slippage_timestamp) &
+            (self.market_data['TargetTime'] == market_id_tuple[0]) &
+            (self.market_data['Expiration'] == market_id_tuple[1])
+        ]
+
+        if not future_data.empty:
+            slippage_row = future_data.iloc[0]
+            if side == 'Up':
+                slipped_price = slippage_row.get('UpAsk', entry_price)
+            elif side == 'Down':
+                slipped_price = slippage_row.get('DownAsk', entry_price)
+            else:
+                slipped_price = entry_price
+
+            if slipped_price > 0:
+                return slipped_price
+
+        return entry_price
+
     def run_strategy(self, strategy_instance):
         current_timestamp = None
         unique_timestamps = self.market_data['Timestamp'].unique()
@@ -210,26 +237,7 @@ class Backtester:
                 if trade_decision:
                     side, quantity, entry_price = trade_decision
 
-                    if self.slippage_seconds > 0:
-                        slippage_timestamp = current_timestamp + pd.Timedelta(seconds=self.slippage_seconds)
-
-                        slippage_data = self.market_data[
-                            (self.market_data['Timestamp'] == slippage_timestamp) &
-                            (self.market_data['TargetTime'] == market_id_tuple[0]) &
-                            (self.market_data['Expiration'] == market_id_tuple[1])
-                        ]
-
-                        if not slippage_data.empty:
-                            slippage_row = slippage_data.iloc[0]
-                            if side == 'Up':
-                                slipped_price = slippage_row.get('UpAsk', entry_price)
-                            elif side == 'Down':
-                                slipped_price = slippage_row.get('DownAsk', entry_price)
-                            else:
-                                slipped_price = entry_price
-
-                            if slipped_price > 0:
-                                entry_price = slipped_price
+                    entry_price = self._apply_slippage(current_timestamp, market_id_tuple, side, entry_price)
 
                     cost = quantity * entry_price
 
