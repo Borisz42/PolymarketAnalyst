@@ -4,9 +4,9 @@ from .base_strategy import Strategy
 class PredictionStrategy(Strategy):
     def __init__(self):
         # Configuration
-        self.MIN_MINUTE = 2
-        self.MAX_MINUTE = 7
-        self.MAX_ENTRY_PRICE = 0.85
+        self.MIN_MINUTE = 1
+        self.MAX_MINUTE = 10
+        self.MAX_ENTRY_PRICE = 0.95
         self.QUANTITY = 1.0 # Buy 1 share per trade
 
         # State
@@ -47,13 +47,13 @@ class PredictionStrategy(Strategy):
             side = "Up"
             ask_price = market_data_point.get("UpAsk")
             if bid_liquidity_imbalance is not None:
-                liquidity_ok = bid_liquidity_imbalance < 0
+                liquidity_ok = bid_liquidity_imbalance > 0
 
         elif down_mid_delta > 0:
             side = "Down"
             ask_price = market_data_point.get("DownAsk")
             if bid_liquidity_imbalance is not None:
-                liquidity_ok = bid_liquidity_imbalance > 0
+                liquidity_ok = bid_liquidity_imbalance < 0
         else:
             return None
 
