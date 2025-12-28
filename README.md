@@ -61,6 +61,15 @@ While spreads are often similar (both 0.01), they can differ when:
 - Volatility affects one side more than the other
 Keeping both provides more accurate data for backtesting and analysis.
 
+### Price Analysis Script
+- **`src/analysis/analyze_prices.py`**: A standalone script to perform a detailed analysis of a given day's market data.
+- **Resolution Analysis**: Determines and logs which markets resolved "Up" or "Down" based on their final prices.
+- **Summary Statistics**: Provides detailed metrics for prices and liquidity across all markets for the analyzed day.
+- **Usage**: To run the script for the date specified in your config, use the command:
+  ```bash
+  python -m src.analysis.analyze_prices
+  ```
+
 ### Interactive Dashboard
 - **Live Auto-Refresh**: Automatically updates periodically (every second) to ensure the latest data is displayed.
 - **Advanced Visualization**:
