@@ -1,4 +1,3 @@
-import pandas as pd
 import src.config as config
 from .backtester import Backtester
 from .strategies.hybrid_strategy import HybridStrategy
