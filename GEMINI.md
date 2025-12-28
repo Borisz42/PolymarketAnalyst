@@ -17,6 +17,7 @@ The project is composed of several key modules, located in the `src` directory:
 *   `src/dashboard/dashboard.py`: A Streamlit application that provides a visualization of historical market data. It reads from the date-stamped CSV specified by the `ANALYSIS_DATE` in the config.
 *   `src/analysis/backtester.py`: A backtesting engine that simulates a `RebalancingStrategy` on historical data from the date-stamped CSV specified by the `ANALYSIS_DATE` in the config.
 *   `src/analysis/slipp_backtester.py`: A second backtester, with a different `RebalancingStrategy`, also using the `ANALYSIS_DATE` from the config.
+*   `src/analysis/analyze_prices.py`: A script for analyzing historical market data from a given day. It provides summary statistics, and determines market resolution outcomes. The script logs which specific markets resolved to "Up" and which to "Down".
 *   `src/data_collection/fetch_current_polymarket.py`: A utility script for fetching data from the Polymarket API.
 *   `risk_engine.py`, `state_manager.py`, and `accumulator.py`: These modules seem to contain the core logic for the trading strategy, risk management, and state tracking, which are utilized by the backtesting scripts.
 
@@ -55,6 +56,13 @@ The backtester will output a detailed report of the strategy's performance, usin
 You can also run the alternative backtester, which uses a liquidity-based strategy:
 ```bash
 python -m src.analysis.slipp_backtester
+```
+
+## 4. Run Price Analysis
+
+To run the price analysis script on the collected historical data, run the following command:
+```bash
+python -m src.analysis.analyze_prices
 ```
 
 # Development Conventions
