@@ -12,7 +12,7 @@ INITIAL_CAPITAL = config.INITIAL_CAPITAL
 
 
 class Backtester:
-    def __init__(self, initial_capital=INITIAL_CAPITAL, slippage_seconds=0):
+    def __init__(self, initial_capital=INITIAL_CAPITAL, slippage_seconds=config.SLIPPAGE_SECONDS):
         self.initial_capital = initial_capital
         self.capital = initial_capital
         self.slippage_seconds = slippage_seconds
