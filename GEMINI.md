@@ -15,10 +15,8 @@ The project is composed of several key modules, located in the `src` directory:
 *   `src/config.py`: Centralized configuration for data file paths, date stamping format, initial capital, and other global parameters. It includes an `ANALYSIS_DATE` setting to specify which day's data the backtesters and dashboard should use.
 *   `src/data_collection/data_logger.py`: A multi-threaded script that fetches market data from Polymarket at regular intervals and **always logs to the current day's** date-stamped CSV file in the `data/` directory (e.g., `data/market_data_YYYYMMDD.csv`).
 *   `src/dashboard/dashboard.py`: A Streamlit application that provides a visualization of historical market data. It reads from the date-stamped CSV specified by the `ANALYSIS_DATE` in the config.
-*   `src/analysis/backtester.py`: A backtesting engine that simulates a `RebalancingStrategy` on historical data from the date-stamped CSV specified by the `ANALYSIS_DATE` in the config.
-*   `src/analysis/slipp_backtester.py`: A second backtester, with a different `RebalancingStrategy`, also using the `ANALYSIS_DATE` from the config.
-*   `src/data_collection/fetch_current_polymarket.py`: A utility script for fetching data from the Polymarket API.
-*   `risk_engine.py`, `state_manager.py`, and `accumulator.py`: These modules seem to contain the core logic for the trading strategy, risk management, and state tracking, which are utilized by the backtesting scripts.
+*   `src/analysis/backtester.py`: A generic backtesting engine that can simulate various trading strategies on historical data.
+*   `src/analysis/strategies/`: A directory containing the different trading strategies that can be used with the backtester.
 
 # Building and Running
 
@@ -42,26 +40,29 @@ streamlit run src/dashboard/dashboard.py
 
 This will open the dashboard in your web browser, typically at `http://localhost:8501`, reading from the data file specified by `ANALYSIS_DATE` in `src/config.py`.
 
-## 3. Run the Backtester
+## 3. Run the Backtester with Different Strategies
 
-To test the trading strategy on the collected historical data, run the backtester with the following command:
+To test a trading strategy on the collected historical data, run the appropriate backtesting script:
 
+**Rebalancing Strategy:**
 ```bash
 python -m src.analysis.backtester
 ```
 
-The backtester will output a detailed report of the strategy's performance, using the data file specified by `ANALYSIS_DATE` in `src/config.py`.
-
-You can also run the alternative backtester, which uses a liquidity-based strategy:
+**Prediction Strategy:**
 ```bash
-python -m src.analysis.slipp_backtester
+python -m src.analysis.prediction_backtester
 ```
+
+The backtester will output a detailed report of the strategy's performance, using the data file specified by `ANALYSIS_DATE` in `src/config.py`.
 
 # Development Conventions
 
 *   **Data Storage:** All market data is stored in date-stamped CSV files, e.g., `data/market_data_YYYYMMDD.csv`. The data logger always writes to the current day's file.
 *   **Configuration:** Key parameters are configured in `src/config.py`. To analyze or backtest a specific day's data, set the `ANALYSIS_DATE` variable. If `ANALYSIS_DATE` is `0`, **the latest available data file** in the `data/` directory will be used for analysis. Otherwise, it should be an integer in `yyyymmdd` format (e.g., `20231225`).
-*   **Modularity:** The project is well-structured, with distinct modules for data logging, visualization, and backtesting located in the `src` directory.
-*   **Error Handling:** The `src/data_collection/data_logger.py` script includes error handling for network requests.
-*   **Concurrency:** The `src/data_collection/data_logger.py` script uses threading to fetch and write data concurrently, ensuring that data collection is not blocked by disk I/O.
-*   **Strategy-based Naming:** The two backtesting scripts (`src/analysis/backtester.py` and `src/analysis/slipp_backtester.py`) suggest a convention of creating separate files for different backtesting strategies.
+*   **Modular Strategies:** The project uses a modular design for trading strategies.
+    *   All strategies are located in the `src/analysis/strategies/` directory.
+    *   Each strategy should be in its own file and inherit from the `Strategy` base class in `src/analysis/strategies/base_strategy.py`.
+    *   To test a new strategy, create a new runner script in `src/analysis/` similar to `prediction_backtester.py`.
+*   **Dependencies:** The project does not have a `requirements.txt` file. Dependencies must be installed manually. So far, `pandas` and `streamlit` are known dependencies.
+*   **Imports:** Scripts within the `src/analysis/` package that are executed as modules must use relative imports (e.g., `from . import ...`) to access other modules within the same package.

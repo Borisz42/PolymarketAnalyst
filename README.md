@@ -77,35 +77,19 @@ Keeping both provides more accurate data for backtesting and analysis.
 
 ### Backtester
 
-An advanced backtesting script (`src/analysis/backtester.py`) that simulates trading strategies on historical Polymarket data with comprehensive risk management and constraint checking.
+An advanced and modular backtesting script (`src/analysis/backtester.py`) that simulates trading strategies on historical Polymarket data with comprehensive risk management and constraint checking.
 
-#### Strategy: RebalancingStrategy
+The backtester is decoupled from the trading strategies, allowing for easy testing of different algorithms. Strategies are located in the `src/analysis/strategies/` directory and inherit from a base `Strategy` class.
 
-The backtester employs a sophisticated **RebalancingStrategy** that focuses on accumulating paired positions (buying both UP and DOWN) when profitable opportunities arise, while maintaining balanced positions.
+#### Included Strategies
 
-**Core Logic:**
-- **Paired Position Accumulation**: Buys both UP and DOWN shares when the combined cost is below the safety margin (0.98)
-- **Position Rebalancing**: Automatically rebalances when positions become imbalanced
-- **Locked Profit Tracking**: Calculates guaranteed profit from paired positions
+1.  **RebalancingStrategy**: A sophisticated strategy that focuses on accumulating paired positions (buying both UP and DOWN) when profitable opportunities arise, while maintaining balanced positions.
+2.  **PredictionStrategy**: A simpler, event-driven strategy that trades based on sharp price movements and liquidity imbalances.
 
-**Advanced Features:**
+#### Advanced Features
 
-1.  **State Calculation** (from accumulator.py):
-    - Tracks average entry prices for UP and DOWN positions
-    - Calculates pair cost (avg_yes + avg_no)
-    - Monitors position delta (imbalance between UP and DOWN)
-    - Computes locked profit from paired positions
-
-2.  **Constraint Checking**:
-    - **Liquidity Constraint**: Ensures opposite side has 3x the required liquidity before trading
-    - **Delta Constraint**: Prevents position imbalance from exceeding 50 shares
-    - **Safety Margin**: Ensures pair cost stays below 0.98
-
-3.  **Risk Management** (from risk_engine.py):
-    - Tracks maximum drawdown throughout the backtest
-    - Monitors peak capital and current capital
-    - Logs risk events (insufficient capital, constraint violations)
-    - Calculates unrealized P&L using mid-market prices
+*   **Slippage Simulation**: The backtester can simulate slippage by using the price from a few seconds after the trade decision. This can be configured in the `backtester.py` script.
+*   **Comprehensive Reporting**: The backtester provides detailed reports including PnL, ROI, max drawdown, and trade statistics.
 
 #### Configuration
 
@@ -118,37 +102,6 @@ INITIAL_CAPITAL = 1000.0              # Starting capital
 # ... other parameters
 ```
 To run the dashboard or backtesters on a specific day's data, simply change the `ANALYSIS_DATE` variable in the config file. The `data_logger.py` will always write to the current day's file, regardless of this setting.
-
-#### Enhanced Reporting
-
-The backtester provides comprehensive reports including:
-- **Performance Metrics**: Total PnL, ROI%, final capital
-- **Risk Metrics**: Maximum drawdown percentage
-- **Trade Statistics**: Win rate, number of markets traded
-- **Position Analysis**: Balanced vs imbalanced markets
-- **Risk Events**: Constraint violations, capital shortfalls
-
-**Example Output:**
-```
---- Backtest Report ---
-Initial Capital: $1000.00
-Final Capital:   $1050.00
-Total PnL:       $50.00 (+5.00%)
-Max Drawdown:    2.34%
-Number of Markets Won: 12
---- Risk Events ---
-Total Risk Events: 3
-  Insufficient Capital: 2
-  Liquidity Constraint: 1
-```
-
-#### Market Resolution
-
-Markets are resolved using mid-market prices for fairness:
-- Uses `UpMid` and `DownMid` from the enhanced CSV data
-- Winning side determined by which price is closer to 0
-- Each winning share pays out $1.00
-
 
 ## How to Run
 
@@ -173,14 +126,14 @@ Open a **new** terminal for each command.
 streamlit run src/dashboard/dashboard.py
 ```
 
-**To Run the Main Backtester:**
+**To Run the Rebalancing Strategy:**
 ```bash
 python -m src.analysis.backtester
 ```
 
-**To Run the Slippage-Aware Backtester:**
+**To Run the Prediction Strategy:**
 ```bash
-python -m src.analysis.slipp_backtester
+python -m src.analysis.prediction_backtester
 ```
 
 ### Dashboard Tips
@@ -209,10 +162,15 @@ PolymarketAnalyst/
 │   └── market_data_YYYYMMDD.csv # Historical data (auto-generated, date-stamped)
 ├── src/
 │   ├── analysis/
+│   │   ├── strategies/
+│   │   │   ├── __init__.py
+│   │   │   ├── base_strategy.py
+│   │   │   ├── rebalancing_strategy.py
+│   │   │   └── prediction_strategy.py
 │   │   ├── __init__.py
 │   │   ├── analyze_prices.py
 │   │   ├── backtester.py
-│   │   └── slipp_backtester.py
+│   │   └── prediction_backtester.py
 │   ├── config.py                # Centralized configuration file
 │   ├── data_collection/
 │   │   ├── __init__.py
