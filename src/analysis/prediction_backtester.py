@@ -1,7 +1,7 @@
 import pandas as pd
 import src.config as config
 from .backtester import Backtester
-from .strategies.prediction_strategy import PredictionStrategy
+from .strategies.signal_rebalancing_strategy import SignalRebalancingStrategy
 
 # CONFIG
 DATA_FILE = config.get_analysis_filename()
@@ -38,7 +38,7 @@ def preprocess_data(df, sharp_move_threshold=SHARP_MOVE_THRESHOLD):
 
 if __name__ == "__main__":
     # Instantiate the strategy
-    strategy = PredictionStrategy()
+    strategy = SignalRebalancingStrategy()
 
     # Instantiate the backtester
     backtester = Backtester(initial_capital=config.INITIAL_CAPITAL)
