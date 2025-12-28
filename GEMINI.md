@@ -18,7 +18,7 @@ The project is composed of several key modules, located in the `src` directory:
 *   `src/analysis/backtester.py`: A generic backtesting engine that can simulate various trading strategies on historical data.
 *   `src/analysis/strategies/`: A directory containing the different trading strategies that can be used with the backtester.
 *   `src/analysis/backtester.py`: A backtesting engine that simulates a `RebalancingStrategy` on historical data from the date-stamped CSV specified by the `ANALYSIS_DATE` in the config.
-*   `src/analysis/slipp_backtester.py`: A second backtester, with a different `RebalancingStrategy`, also using the `ANALYSIS_DATE` from the config.
+*   `src/analysis/prediction_backtester.py`: A second backtester, which uses a `PredictionStrategy` on historical data from the date-stamped CSV specified by the `ANALYSIS_DATE` in the config.
 *   `src/analysis/analyze_prices.py`: A script for analyzing historical market data from a given day. It provides summary statistics, and determines market resolution outcomes. The script logs which specific markets resolved to "Up" and which to "Down".
 *   `src/data_collection/fetch_current_polymarket.py`: A utility script for fetching data from the Polymarket API.
 *   `risk_engine.py`, `state_manager.py`, and `accumulator.py`: These modules seem to contain the core logic for the trading strategy, risk management, and state tracking, which are utilized by the backtesting scripts.

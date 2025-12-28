@@ -195,6 +195,32 @@ PolymarketAnalyst/
 └── README.md                    # This file
 ```
 
+## Testing
+
+This project includes a suite of tests to ensure the backtester is working correctly. The tests are located in the `tests/` directory and use the `pytest` framework.
+
+### Test Coverage
+
+The current tests cover the following functionalities:
+
+- **Data Loading**: Verifies that the test data is loaded correctly and that timestamps are parsed properly.
+- **Slippage Simulation**: Ensures that the slippage calculation is applied correctly when enabled.
+- **PnL Calculation**: Checks that both winning and losing trades have their Profit and Loss calculated accurately.
+
+### How to Run Tests
+
+To run the tests, you will need to have `pytest` installed. You can install it via pip:
+
+```bash
+pip install pytest
+```
+
+Once `pytest` is installed, you can run the entire test suite by running the following command from the root directory of the project:
+
+```bash
+pytest
+```
+
 ## Contributing
 
 Contributions are welcome! Feel free to open issues or submit pull requests.
