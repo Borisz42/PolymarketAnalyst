@@ -5,7 +5,7 @@ from .strategies.prediction_strategy import PredictionStrategy
 
 # CONFIG
 DATA_FILE = config.get_analysis_filename()
-SHARP_MOVE_THRESHOLD = 0.04
+SHARP_MOVE_THRESHOLD = 0.08
 
 def preprocess_data(df):
     """Pre-processes the market data to add features required by the PredictionStrategy."""
@@ -31,32 +31,8 @@ def preprocess_data(df):
         (df["DownMidDelta"].abs() >= SHARP_MOVE_THRESHOLD)
     )
 
-    # --- Signal Generation ---
-    def generate_signal(row):
-        up_score = 0
-        down_score = 0
-
-        # Signal 1: Price Delta
-        if row["UpMidDelta"] > 0:
-            up_score += 1
-        if row["DownMidDelta"] > 0:
-            down_score += 1
-
-        # Signal 2: Liquidity Imbalance
-        if row["BidLiquidityImbalance"] > 0:
-            up_score += 1
-        elif row["BidLiquidityImbalance"] < 0:
-            down_score += 1
-
-        # Decision based on score
-        if up_score >= 2:
-            return "Up"
-        elif down_score >= 2:
-            return "Down"
-        else:
-            return "Hold"
-
-    df["Signal"] = df.apply(generate_signal, axis=1)
+    # --- Signal Generation: Moved to PredictionStrategy ---
+    # The strategy now calculates the signal internally.
 
     return df
 
