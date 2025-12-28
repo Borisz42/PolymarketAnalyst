@@ -5,9 +5,9 @@ from .strategies.prediction_strategy import PredictionStrategy
 
 # CONFIG
 DATA_FILE = config.get_analysis_filename()
-SHARP_MOVE_THRESHOLD = 0.08
+SHARP_MOVE_THRESHOLD = 0.04
 
-def preprocess_data(df):
+def preprocess_data(df, sharp_move_threshold=SHARP_MOVE_THRESHOLD):
     """Pre-processes the market data to add features required by the PredictionStrategy."""
     df = df.sort_values(["TargetTime", "Expiration", "Timestamp"]).reset_index(drop=True)
 
@@ -27,8 +27,8 @@ def preprocess_data(df):
 
     # Sharp information arrival
     df["SharpEvent"] = (
-        (df["UpMidDelta"].abs() >= SHARP_MOVE_THRESHOLD) |
-        (df["DownMidDelta"].abs() >= SHARP_MOVE_THRESHOLD)
+        (df["UpMidDelta"].abs() >= sharp_move_threshold) |
+        (df["DownMidDelta"].abs() >= sharp_move_threshold)
     )
 
     # --- Signal Generation: Moved to PredictionStrategy ---
