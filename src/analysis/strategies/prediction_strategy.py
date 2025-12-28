@@ -38,27 +38,34 @@ class PredictionStrategy(Strategy):
         if not sharp_event:
             return None
 
-        # --- Directional logic
+        # --- Multi-Signal Scoring Logic ---
+        up_score = 0
+        down_score = 0
+
+        # Signal 1: Price Delta
+        if up_mid_delta > 0:
+            up_score += 1
+        if down_mid_delta > 0:
+            down_score += 1
+
+        # Signal 2: Liquidity Imbalance
+        if bid_liquidity_imbalance is not None:
+            if bid_liquidity_imbalance > 0:
+                up_score += 1
+            elif bid_liquidity_imbalance < 0:
+                down_score += 1
+
+        # --- Decision based on score ---
         side = None
         ask_price = None
-        liquidity_ok = False
 
-        if up_mid_delta > 0:
+        if up_score >= 2:
             side = "Up"
             ask_price = market_data_point.get("UpAsk")
-            if bid_liquidity_imbalance is not None:
-                liquidity_ok = bid_liquidity_imbalance > 0
-
-        elif down_mid_delta > 0:
+        elif down_score >= 2:
             side = "Down"
             ask_price = market_data_point.get("DownAsk")
-            if bid_liquidity_imbalance is not None:
-                liquidity_ok = bid_liquidity_imbalance < 0
         else:
-            return None
-
-        # --- Liquidity confirmation
-        if not liquidity_ok:
             return None
 
         # --- Price sanity check
