@@ -29,7 +29,7 @@ def fetch_worker():
     """
     Background worker to fetch data and put it in the queue.
     """
-    timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    timestamp = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
     start_time = time.time()
     
     try:

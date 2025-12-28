@@ -19,7 +19,7 @@ The enhanced data logger captures comprehensive order book data in date-stamped 
 
 | Column | Description | Example | Notes |
 |--------|-------------|---------|-------|
-| `Timestamp` | When the data was logged | `2025-12-25 17:00:21` | Local time |
+| `Timestamp` | When the data was logged | `2025-12-25 17:00:21` | UTC |
 | `TargetTime` | Market's target time (start of 15-min window) | `2025-12-25 16:00:00` | UTC |
 | `Expiration` | Market expiration time | `2025-12-25 16:15:00` | UTC |
 | `UpBid` | Best bid price for UP contracts | `0.57` | Highest price buyers offer |
