@@ -4,10 +4,10 @@ from .base_strategy import Strategy
 class PredictionStrategy(Strategy):
     def __init__(self):
         # Configuration
-        self.MIN_MINUTE = 1
-        self.MAX_MINUTE = 10
-        self.MAX_ENTRY_PRICE = 0.95
-        self.QUANTITY = 1.0 # Buy 1 share per trade
+        self.MIN_MINUTE = 2
+        self.MAX_MINUTE = 7
+        self.MAX_ENTRY_PRICE = 0.75
+        self.QUANTITY = 100.0 # Buy this many shares per trade
 
         # State
         self.entered_markets = set()
