@@ -4,9 +4,9 @@ from .base_strategy import Strategy
 class PredictionStrategy(Strategy):
     def __init__(self):
         # Configuration
-        self.MIN_MINUTE = 2
-        self.MAX_MINUTE = 7
-        self.MAX_ENTRY_PRICE = 0.85
+        self.MIN_MINUTE = 1
+        self.MAX_MINUTE = 10
+        self.MAX_ENTRY_PRICE = 0.95
         self.QUANTITY = 1.0 # Buy 1 share per trade
 
         # State
@@ -22,12 +22,10 @@ class PredictionStrategy(Strategy):
         # We assume the dataframe passed to the backtester is pre-processed with these columns.
         minute = market_data_point.get("MinuteFromStart")
         sharp_event = market_data_point.get("SharpEvent")
-        up_mid_delta = market_data_point.get("UpMidDelta")
-        down_mid_delta = market_data_point.get("DownMidDelta")
-        bid_liquidity_imbalance = market_data_point.get("BidLiquidityImbalance")
+        signal = market_data_point.get("Signal")
 
-        # The first row for each market will have NaN deltas after pre-processing
-        if pd.isna(up_mid_delta) or pd.isna(down_mid_delta):
+        # The first row for each market will have NaN deltas after pre-processing, resulting in a "Hold" signal.
+        if signal == "Hold":
             return None
 
         # --- Time filter
@@ -38,27 +36,17 @@ class PredictionStrategy(Strategy):
         if not sharp_event:
             return None
 
-        # --- Directional logic
+        # --- Decision based on pre-calculated signal ---
         side = None
         ask_price = None
-        liquidity_ok = False
 
-        if up_mid_delta > 0:
+        if signal == "Up":
             side = "Up"
             ask_price = market_data_point.get("UpAsk")
-            if bid_liquidity_imbalance is not None:
-                liquidity_ok = bid_liquidity_imbalance < 0
-
-        elif down_mid_delta > 0:
+        elif signal == "Down":
             side = "Down"
             ask_price = market_data_point.get("DownAsk")
-            if bid_liquidity_imbalance is not None:
-                liquidity_ok = bid_liquidity_imbalance > 0
         else:
-            return None
-
-        # --- Liquidity confirmation
-        if not liquidity_ok:
             return None
 
         # --- Price sanity check
