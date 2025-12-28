@@ -52,6 +52,7 @@ def analyze_signals():
 
     correct_signals = 0
     total_signals = 0
+    mock_capital = 10000
 
     # Group data by market
     grouped = data.groupby(['TargetTime', 'Expiration'])
@@ -60,8 +61,9 @@ def analyze_signals():
         winning_side = get_winning_side(market_data)
 
         for _, row in market_data.iterrows():
-            signal = strategy._get_signal(row)
-            if signal:
+            decision = strategy.decide(row, mock_capital)
+            if decision:
+                signal, _, _ = decision
                 confidence = get_confidence_score(row)
                 total_signals += 1
                 if signal == winning_side:

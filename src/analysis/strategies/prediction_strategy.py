@@ -3,12 +3,15 @@ from .base_strategy import Strategy
 import math
 
 class PredictionStrategy(Strategy):
-    def __init__(self):
+    def __init__(self, price_delta_weight=1.0, liquidity_imbalance_weight=1.0, min_score_threshold=1):
         # Configuration
         self.MIN_MINUTE = 2
         self.MAX_MINUTE = 7
         self.RISK_PER_TRADE = 0.005 # Risk 0.5% of capital per trade
         self.MAX_ALLOCATION_PER_TRADE = 0.1 # Max 10% of capital per trade
+        self.PRICE_DELTA_WEIGHT = price_delta_weight
+        self.LIQUIDITY_IMBALANCE_WEIGHT = liquidity_imbalance_weight
+        self.MIN_SCORE_THRESHOLD = min_score_threshold
 
     def _get_signal(self, market_data_point):
         up_score = 0
@@ -16,21 +19,21 @@ class PredictionStrategy(Strategy):
 
         # Signal 1: Price Delta
         if market_data_point["UpMidDelta"] > 0:
-            up_score += 1
+            up_score += self.PRICE_DELTA_WEIGHT
         if market_data_point["DownMidDelta"] > 0:
-            down_score += 1
+            down_score += self.PRICE_DELTA_WEIGHT
 
         # Signal 2: Liquidity Imbalance
         if market_data_point["BidLiquidityImbalance"] > 0:
-            up_score += 1
+            up_score += self.LIQUIDITY_IMBALANCE_WEIGHT
         elif market_data_point["BidLiquidityImbalance"] < 0:
-            down_score += 1
+            down_score += self.LIQUIDITY_IMBALANCE_WEIGHT
 
         side = None
 
-        if up_score >= 2:
+        if up_score >= self.MIN_SCORE_THRESHOLD:
             side = "Up"
-        elif down_score >= 2:
+        elif down_score >= self.MIN_SCORE_THRESHOLD:
             side = "Down"
 
         return side
