@@ -7,7 +7,7 @@ class PredictionStrategy(Strategy):
         # Configuration
         self.MIN_MINUTE = 2
         self.MAX_MINUTE = 7
-        self.RISK_PER_TRADE = 0.02 # Risk 2% of capital per trade
+        self.RISK_PER_TRADE = 0.005 # Risk 0.5% of capital per trade
         self.MAX_ALLOCATION_PER_TRADE = 0.1 # Max 10% of capital per trade
 
     def _get_signal(self, market_data_point):
@@ -26,17 +26,14 @@ class PredictionStrategy(Strategy):
         elif market_data_point["BidLiquidityImbalance"] < 0:
             down_score += 1
 
-        signal_strength = 0
         side = None
 
         if up_score >= 2:
             side = "Up"
-            signal_strength = up_score
         elif down_score >= 2:
             side = "Down"
-            signal_strength = down_score
 
-        return side, signal_strength
+        return side
 
     def decide(self, market_data_point, current_capital):
         # We assume the dataframe passed to the backtester is pre-processed with these columns.
@@ -44,6 +41,9 @@ class PredictionStrategy(Strategy):
         sharp_event = market_data_point.get("SharpEvent")
 
         # The first row for each market will have NaN deltas after pre-processing, so _get_signal will correctly return no signal.
+        if pd.isna(market_data_point.get("UpMidDelta")):
+            return None
+
         # --- Time filter
         if minute is None or not (self.MIN_MINUTE <= minute <= self.MAX_MINUTE):
             return None
@@ -53,7 +53,7 @@ class PredictionStrategy(Strategy):
             return None
 
         # --- Decision based on pre-calculated signal ---
-        side, signal_strength = self._get_signal(market_data_point)
+        side = self._get_signal(market_data_point)
 
         if not side:
             return None
@@ -68,13 +68,8 @@ class PredictionStrategy(Strategy):
         if ask_price is None or ask_price <= 0 or ask_price >= 1.0:
             return None
 
-        # --- Calculate trade size based on signal strength and capital
-        # Since signal_strength is always 2, we can simplify the scaling factor.
-        # This can be made more complex if signal generation becomes more granular.
-        scaled_risk = self.RISK_PER_TRADE
-
-        # Calculate position size based on scaled risk
-        trade_capital = current_capital * scaled_risk
+        # --- Calculate trade size based on capital
+        trade_capital = current_capital * self.RISK_PER_TRADE
 
         # Enforce max allocation
         trade_capital = min(trade_capital, current_capital * self.MAX_ALLOCATION_PER_TRADE)

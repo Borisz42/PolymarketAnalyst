@@ -5,7 +5,7 @@ from .strategies.prediction_strategy import PredictionStrategy
 
 # CONFIG
 DATA_FILE = config.get_analysis_filename()
-SHARP_MOVE_THRESHOLD = 0.04
+SHARP_MOVE_THRESHOLD = 0.08
 
 def preprocess_data(df):
     """Pre-processes the market data to add features required by the PredictionStrategy."""
