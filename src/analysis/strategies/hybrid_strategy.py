@@ -7,7 +7,7 @@ class HybridStrategy(Strategy):
     def __init__(self):
         # Parameters from RebalancingStrategy
         self.SAFETY_MARGIN_M = 0.99
-        self.MAX_TRADE_SIZE = 500
+        self.MAX_ALLOCATION_PER_REBALANCE = 0.5
         self.MIN_BALANCE_QTY = 1
 
         # Risk management parameters from RebalancingStrategy
@@ -17,8 +17,7 @@ class HybridStrategy(Strategy):
         # Parameters from PredictionStrategy
         self.MIN_MINUTE = 2
         self.MAX_MINUTE = 7
-        self.RISK_PER_TRADE = 0.005
-        self.MAX_ALLOCATION_PER_TRADE = 0.1
+        self.MAX_ALLOCATION_PER_TRADE = 0.05
         self.PRICE_DELTA_WEIGHT = 1.0
         self.LIQUIDITY_IMBALANCE_WEIGHT = 1.0
         self.MIN_SCORE_THRESHOLD = 1
@@ -148,7 +147,7 @@ class HybridStrategy(Strategy):
             if ask_price is None or ask_price <= 0 or ask_price >= 1.0:
                 return None
 
-            trade_capital = min(current_capital * self.RISK_PER_TRADE, current_capital * self.MAX_ALLOCATION_PER_TRADE)
+            trade_capital = current_capital * self.MAX_ALLOCATION_PER_TRADE
             quantity = math.floor(trade_capital / ask_price)
 
             if quantity == 0:
@@ -173,7 +172,7 @@ class HybridStrategy(Strategy):
             if target_price <= 0:
                 return None
 
-            qty_to_buy = int(min(quantity_delta, self.MAX_TRADE_SIZE))
+            qty_to_buy = int(min(quantity_delta, current_capital * self.MAX_ALLOCATION_PER_REBALANCE))
             while qty_to_buy > 0:
                 cost = qty_to_buy * target_price
                 if cost > current_capital:
