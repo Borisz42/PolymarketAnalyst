@@ -21,12 +21,12 @@ A Python-based tool to monitor **Polymarket's 15-minute Bitcoin (BTC) Up/Down pr
 
 ## Architecture
 
-The project is organized into three main directories:
+The project is organized into three main directories. For more detailed information on each module, please refer to the `README.md` file within the respective directory.
 
 -   `src/`: Contains the core application logic.
-    -   `data_collection/`: Scripts for fetching and logging market data.
-    -   `analysis/`: Tools for backtesting trading strategies and analyzing market data.
-    -   `dashboard/`: The Streamlit-based interactive dashboard.
+    -   `data_collection/`: Scripts for fetching and logging market data. ([Detailed Documentation](src/data_collection/README.md))
+    -   `analysis/`: Tools for backtesting trading strategies and analyzing market data. ([Detailed Documentation](src/analysis/README.md))
+    -   `dashboard/`: The Streamlit-based interactive dashboard. ([Detailed Documentation](src/dashboard/README.md))
 -   `data/`: Stores historical market data in CSV format.
 -   `tests/`: Contains unit tests for the backtester and other critical components.
 
