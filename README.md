@@ -21,7 +21,49 @@ A Python-based tool to monitor **Polymarket's 15-minute Bitcoin (BTC) Up/Down pr
 
 ## Architecture
 
-The project is organized into three main directories. For more detailed information on each module, please refer to the `README.md` file within the respective directory.
+The project is organized into the following structure. For more detailed information on each module, please refer to the `README.md` file within the respective directory.
+
+```
+PolymarketAnalyst/
+├── AGENTS.md
+├── GEMINI.md
+├── README.md
+├── data/
+│   └── market_data_20251226.csv
+├── requirements.txt
+├── src/
+│   ├── __init__.py
+│   ├── analysis/
+│   │   ├── README.md
+│   │   ├── __init__.py
+│   │   ├── analyze_prices.py
+│   │   ├── backtester.py
+│   │   ├── hybrid_backtester.py
+│   │   ├── prediction_backtester.py
+│   │   ├── signal_accuracy_checker.py
+│   │   └── strategies/
+│   │       ├── __init__.py
+│   │       ├── base_strategy.py
+│   │       ├── hybrid_strategy.py
+│   │       ├── prediction_strategy.py
+│   │       └── rebalancing_strategy.py
+│   ├── config.py
+│   ├── dashboard/
+│   │   ├── README.md
+│   │   ├── __init__.py
+│   │   └── dashboard.py
+│   └── data_collection/
+│       ├── README.md
+│       ├── __init__.py
+│       ├── data_logger.py
+│       ├── fetch_current_polymarket.py
+│       ├── find_new_market.py
+│       └── get_current_markets.py
+└── tests/
+    ├── data/
+    │   └── test_market_data.csv
+    └── test_backtester.py
+```
 
 -   `src/`: Contains the core application logic.
     -   `data_collection/`: Scripts for fetching and logging market data. ([Detailed Documentation](src/data_collection/README.md))
