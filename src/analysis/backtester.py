@@ -353,13 +353,13 @@ class Backtester:
             else:
                 losing_trades_count += 1
         
-        print(f"Number of Buy Trades: {len(buy_trades)}")
         print(f"Number of Markets Traded: {num_markets_played}")
         print(f"Number of Markets Won: {num_markets_won}")
-        print(f"Total Up Shares: {total_up_shares}")
-        print(f"Total Down Shares: {total_down_shares}")
+        print(f"Number of Trading actions: {len(buy_trades)}")
         print(f"Number of Winning Trades: {winning_trades_count}")
         print(f"Number of Losing Trades: {losing_trades_count}")
+        print(f"Total Up Shares: {total_up_shares}")
+        print(f"Total Down Shares: {total_down_shares}")
         
         # Risk events summary
         if self.risk_events:

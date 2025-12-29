@@ -9,7 +9,7 @@ DATE_FILENAME_FORMAT = "%Y%m%d" # yyyymmdd
 
 # --- Analysis Configuration ---
 # Set to 0 to use the latest available data file for analysis.
-# Set to a specific date in yyyymmdd format (e.g., 20231225) to analyze that day's data.
+# Set to a specific date in yyyymmdd format (e.g., 20251226) to analyze that day's data.
 ANALYSIS_DATE = 0
 
 def get_logger_filename():
@@ -45,4 +45,4 @@ FETCH_INTERVAL_SECONDS = 1
 WRITE_INTERVAL_SECONDS = 5
 MAX_WORKERS = 15
 INITIAL_CAPITAL = 1000.0
-SLIPPAGE_SECONDS = 0
+SLIPPAGE_SECONDS = 1
