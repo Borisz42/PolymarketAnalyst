@@ -24,7 +24,7 @@ class Backtester:
         
         # Risk tracking (from risk_engine.py)
         self.max_drawdown = 0.0
-        self.peak_capital = initial_capital
+        self.peak_portfolio_value = initial_capital
         self.risk_events = []  # Track risk-related events
 
     def load_data(self, file_path):
@@ -164,12 +164,37 @@ class Backtester:
         print(f"  Avg Time Between Trades: {avg_time_between_trades_str}")
         print("--------------------------------------------------")
 
-    def _update_risk_metrics(self):
+    def _update_risk_metrics(self, current_data_points):
         """Update risk metrics including drawdown tracking."""
-        if self.capital > self.peak_capital:
-            self.peak_capital = self.capital
+        open_positions_value = 0.0
+        for position in self.open_positions:
+            market_id = position['market_id']
+
+            # Find the current market data for the position
+            market_data_row = current_data_points[
+                (current_data_points['TargetTime'] == market_id[0]) &
+                (current_data_points['Expiration'] == market_id[1])
+            ]
+
+            if not market_data_row.empty:
+                current_price = 0.0
+                if position['side'] == 'Up':
+                    current_price = market_data_row.iloc[0].get('UpMid', position['entry_price'])
+                elif position['side'] == 'Down':
+                    current_price = market_data_row.iloc[0].get('DownMid', position['entry_price'])
+
+                open_positions_value += position['quantity'] * current_price
+            else:
+                # If market data is not available for the current timestamp,
+                # value the position at its entry cost as a fallback.
+                open_positions_value += position['quantity'] * position['entry_price']
+
+        total_portfolio_value = self.capital + open_positions_value
+
+        if total_portfolio_value > self.peak_portfolio_value:
+            self.peak_portfolio_value = total_portfolio_value
         
-        current_drawdown = (self.peak_capital - self.capital) / self.peak_capital if self.peak_capital > 0 else 0
+        current_drawdown = (self.peak_portfolio_value - total_portfolio_value) / self.peak_portfolio_value if self.peak_portfolio_value > 0 else 0
         if current_drawdown > self.max_drawdown:
             self.max_drawdown = current_drawdown
 
@@ -227,11 +252,11 @@ class Backtester:
             for index in sorted(positions_to_remove_indices, reverse=True):
                 del self.open_positions[index]
 
-            # Update risk metrics
-            self._update_risk_metrics()
-
             # Get all data points for the current timestamp
             current_data_points = self.market_data[self.market_data['Timestamp'] == current_timestamp]
+
+            # Update risk metrics
+            self._update_risk_metrics(current_data_points)
 
             for _, row in current_data_points.iterrows():
                 market_id_tuple = (row['TargetTime'], row['Expiration'])
