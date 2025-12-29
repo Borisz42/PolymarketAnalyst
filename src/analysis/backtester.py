@@ -62,18 +62,19 @@ class Backtester:
         last_dp = market_specific_data[-1] # The final state of the market
 
         winning_side = None
-        # Use mid prices to determine winner
-        up_mid = last_dp.get('UpAsk', last_dp.get('UpPrice', 0))
-        down_mid = last_dp.get('DownAsk', last_dp.get('DownPrice', 0))
+        # In Polymarket, when a side is certain to win, its Ask price becomes 0
+        # because you can no longer buy it. The original logic correctly handles this.
+        up_ask = last_dp.get('UpAsk', last_dp.get('UpPrice', 0))
+        down_ask = last_dp.get('DownAsk', last_dp.get('DownPrice', 0))
         
-        if up_mid == 0:  # If Up price is 0, then Up wins
+        if up_ask == 0:
             winning_side = 'Up'
-        elif down_mid == 0: # If Down price is 0, then Down wins
+        elif down_ask == 0:
             winning_side = 'Down'
-        elif down_mid > up_mid:
+        elif down_ask > up_ask:
             winning_side = 'Down'
         else:
-            winning_side = 'Up' 
+            winning_side = 'Up'
         
         pnl = 0
 
@@ -264,6 +265,10 @@ class Backtester:
                 trade_decision = strategy_instance.decide(row, self.capital)
                 
                 if trade_decision:
+                    # Reject trades at or after expiration
+                    if current_timestamp >= row['Expiration']:
+                        continue
+
                     side, quantity, entry_price = trade_decision
 
                     entry_price = self._apply_slippage(current_timestamp, market_id_tuple, side, entry_price)
