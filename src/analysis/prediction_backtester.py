@@ -5,7 +5,7 @@ from .strategies.signal_rebalancing_strategy import SignalRebalancingStrategy
 
 # CONFIG
 DATA_FILE = config.get_analysis_filename()
-SHARP_MOVE_THRESHOLD = 0.04
+SHARP_MOVE_THRESHOLD = 0.08
 
 def preprocess_data(df, sharp_move_threshold=SHARP_MOVE_THRESHOLD):
     """Pre-processes the market data to add features required by the PredictionStrategy."""
@@ -41,7 +41,7 @@ if __name__ == "__main__":
     strategy = SignalRebalancingStrategy()
 
     # Instantiate the backtester
-    backtester = Backtester(initial_capital=config.INITIAL_CAPITAL)
+    backtester = Backtester(initial_capital=config.INITIAL_CAPITAL, slippage_seconds=1)
 
     # Load data
     try:
