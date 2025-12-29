@@ -82,3 +82,33 @@ def test_stop_loss_not_triggered_during_normal_trading():
     decision = strategy.decide(market_data_point, 1000)
 
     assert decision is None, "No trade should have been made"
+
+def test_stop_loss_with_insufficient_capital_rebalances_partially():
+    strategy = HybridStrategy()
+    market_id = ('2023-01-01 12:00:00', '2023-01-01 12:15:00')
+
+    # Simulate an imbalanced portfolio where rebalancing would exceed the stop-loss threshold
+    strategy.update_portfolio(market_id, 'Up', 100, 0.6)
+    strategy.update_portfolio(market_id, 'Down', 0, 0)
+
+    market_data_point = {
+        'TargetTime': '2023-01-01 12:00:00',
+        'Expiration': '2023-01-01 12:15:00',
+        'UpAsk': 0.7,
+        'DownAsk': 0.51,  # Price that will trigger the stop loss (0.6 + 0.51 = 1.11 > 1.1)
+        'UpAskLiquidity': 500,
+        'DownAskLiquidity': 500,
+        'MinuteFromStart': 8,
+        'SharpEvent': False,
+        'UpMidDelta': 0.01,
+        'DownMidDelta': -0.01,
+        'BidLiquidityImbalance': 10
+    }
+
+    # Capital is insufficient for a full rebalance (100 * 0.51 = 51)
+    decision = strategy.decide(market_data_point, 30)
+
+    assert decision is not None, "A partial rebalancing trade should have been made"
+    assert decision[0] == 'Down', "Should be buying the other side to hedge"
+    assert decision[1] > 0, "Should be buying a positive quantity"
+    assert decision[1] < 100, "Should be buying less than the full amount"

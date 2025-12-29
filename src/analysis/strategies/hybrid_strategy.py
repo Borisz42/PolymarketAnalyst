@@ -6,9 +6,9 @@ from .base_strategy import Strategy
 class HybridStrategy(Strategy):
     def __init__(self):
         # Parameters from RebalancingStrategy
-        self.MAX_HEDGING_COST = 1.0
-        self.STOP_LOSS_THRESHOLD = 1.2
-        self.MAX_ALLOCATION_PER_REBALANCE = 0.5
+        self.MAX_HEDGING_COST = 0.99
+        self.STOP_LOSS_THRESHOLD = 1.1
+        self.MAX_ALLOCATION_PER_REBALANCE = 0.25
         self.MIN_BALANCE_QTY = 1
 
         # Risk management parameters from RebalancingStrategy
@@ -182,11 +182,15 @@ class HybridStrategy(Strategy):
 
             if new_combined_avg_p > self.STOP_LOSS_THRESHOLD:
                 qty_to_buy = qty_to_buy_full
-                cost = qty_to_buy * target_price
-                if cost <= current_capital and \
-                   self.check_delta_constraint(portfolio, target_side, qty_to_buy) and \
-                   self.check_liquidity_constraint(market_data_point, target_side, qty_to_buy):
-                    return (target_side, qty_to_buy, target_price)
+                while qty_to_buy > 0:
+                    cost = qty_to_buy * target_price
+                    if cost > current_capital:
+                        qty_to_buy -= 1
+                        continue
+                    if self.check_delta_constraint(portfolio, target_side, qty_to_buy) and \
+                       self.check_liquidity_constraint(market_data_point, target_side, qty_to_buy):
+                        return (target_side, qty_to_buy, target_price)
+                    qty_to_buy -= 1
                 return None
 
             qty_to_buy = int(min(quantity_delta, current_capital * self.MAX_ALLOCATION_PER_REBALANCE))
