@@ -24,7 +24,7 @@ class Backtester:
         
         # Risk tracking (from risk_engine.py)
         self.max_drawdown = 0.0
-        self.peak_portfolio_value = initial_capital
+        self.portfolio_history = []  # Tracks (timestamp, capital) after each market resolution
         self.risk_events = []  # Track risk-related events
 
     def load_data(self, file_path):
@@ -158,45 +158,44 @@ class Backtester:
         print(f"Total PnL for market: ${total_market_pnl:.2f}")
         print(f"Up Shares: {total_up_shares}, Avg Entry Price: ${avg_up_price:.2f}")
         print(f"Down Shares: {total_down_shares}, Avg Entry Price: ${avg_down_price:.2f}")
+
+        # Find the portfolio value at the time of this market's resolution
+        resolution_timestamp = market_id_tuple[1]
+        portfolio_value_at_resolution = self.initial_capital
+
+        # Find the portfolio value recorded at the first timestamp >= resolution_timestamp
+        portfolio_value_at_resolution = None
+        for ts, capital in self.portfolio_history:
+            if ts >= resolution_timestamp:
+                portfolio_value_at_resolution = capital
+                break  # Found the first snapshot after resolution
+
+        if portfolio_value_at_resolution is not None:
+             print(f"Portfolio Value After Resolution: ${portfolio_value_at_resolution:.2f}")
+
         print(f"Execution Stats:")
         print(f"  Total Trades: {total_trades}")
         print(f"  Avg Trade Size: {avg_trade_size:.1f} shares")
         print(f"  Avg Time Between Trades: {avg_time_between_trades_str}")
         print("--------------------------------------------------")
 
-    def _update_risk_metrics(self, current_data_points):
-        """Update risk metrics including drawdown tracking."""
-        open_positions_value = 0.0
-        for position in self.open_positions:
-            market_id = position['market_id']
+    def _calculate_max_drawdown(self):
+        """Calculates the maximum drawdown from the portfolio history."""
+        if not self.portfolio_history:
+            return 0.0
 
-            # Find the current market data for the position
-            market_data_row = current_data_points[
-                (current_data_points['TargetTime'] == market_id[0]) &
-                (current_data_points['Expiration'] == market_id[1])
-            ]
+        peak = self.initial_capital
+        max_drawdown = 0.0
 
-            if not market_data_row.empty:
-                current_price = 0.0
-                if position['side'] == 'Up':
-                    current_price = market_data_row.iloc[0].get('UpMid', position['entry_price'])
-                elif position['side'] == 'Down':
-                    current_price = market_data_row.iloc[0].get('DownMid', position['entry_price'])
+        for _, value in self.portfolio_history:
+            if value > peak:
+                peak = value
 
-                open_positions_value += position['quantity'] * current_price
-            else:
-                # If market data is not available for the current timestamp,
-                # value the position at its entry cost as a fallback.
-                open_positions_value += position['quantity'] * position['entry_price']
-
-        total_portfolio_value = self.capital + open_positions_value
-
-        if total_portfolio_value > self.peak_portfolio_value:
-            self.peak_portfolio_value = total_portfolio_value
+            drawdown = (peak - value) / peak if peak > 0 else 0
+            if drawdown > max_drawdown:
+                max_drawdown = drawdown
         
-        current_drawdown = (self.peak_portfolio_value - total_portfolio_value) / self.peak_portfolio_value if self.peak_portfolio_value > 0 else 0
-        if current_drawdown > self.max_drawdown:
-            self.max_drawdown = current_drawdown
+        return max_drawdown
 
     def _apply_slippage(self, current_timestamp, market_id_tuple, side, entry_price):
         """Applies slippage to the entry price."""
@@ -249,14 +248,15 @@ class Backtester:
                     positions_to_remove_indices.append(i)
             
             # Remove resolved positions from self.open_positions
-            for index in sorted(positions_to_remove_indices, reverse=True):
-                del self.open_positions[index]
+            if positions_to_remove_indices:
+                for index in sorted(positions_to_remove_indices, reverse=True):
+                    del self.open_positions[index]
+
+                # Record portfolio value after resolutions
+                self.portfolio_history.append((current_timestamp, self.capital))
 
             # Get all data points for the current timestamp
             current_data_points = self.market_data[self.market_data['Timestamp'] == current_timestamp]
-
-            # Update risk metrics
-            self._update_risk_metrics(current_data_points)
 
             for _, row in current_data_points.iterrows():
                 market_id_tuple = (row['TargetTime'], row['Expiration'])
@@ -324,6 +324,7 @@ class Backtester:
         total_pnl = self.capital - self.initial_capital
         roi = (total_pnl / self.initial_capital) * 100 if self.initial_capital > 0 else 0
         print(f"Total PnL:       ${total_pnl:.2f} ({roi:+.2f}%)")
+        self.max_drawdown = self._calculate_max_drawdown()
         print(f"Max Drawdown:    {self.max_drawdown * 100:.2f}%")
         
         buy_trades = [t for t in self.transactions if t['Type'] == 'Buy']
