@@ -7,6 +7,7 @@ class HybridStrategy(Strategy):
     def __init__(self):
         # Parameters from RebalancingStrategy
         self.SAFETY_MARGIN_M = 0.99
+        self.STOP_LOSS_THRESHOLD = 1.1
         self.MAX_ALLOCATION_PER_REBALANCE = 0.5
         self.MIN_BALANCE_QTY = 1
 
@@ -96,7 +97,7 @@ class HybridStrategy(Strategy):
             new_delta = current_delta - qty_to_buy
         return abs(new_delta) <= self.MAX_UNHEDGED_DELTA
 
-    def check_safety_margin(self, portfolio, target_side, qty_to_buy, price):
+    def _calculate_new_avg_price(self, portfolio, target_side, qty_to_buy, price):
         qty_yes, qty_no = portfolio['qty_yes'], portfolio['qty_no']
         cost_yes, cost_no = portfolio['cost_yes'], portfolio['cost_no']
         avg_p_yes = cost_yes / qty_yes if qty_yes > 0 else 0
@@ -105,17 +106,21 @@ class HybridStrategy(Strategy):
         if target_side == 'Up':
             new_cost_yes = cost_yes + qty_to_buy * price
             new_qty_yes = qty_yes + qty_to_buy
-            if new_qty_yes == 0: return False
+            if new_qty_yes == 0: return float('inf')
             new_avg_p_yes = new_cost_yes / new_qty_yes
             new_combined_avg_p = new_avg_p_yes + avg_p_no
         elif target_side == 'Down':
             new_cost_no = cost_no + qty_to_buy * price
             new_qty_no = qty_no + qty_to_buy
-            if new_qty_no == 0: return False
+            if new_qty_no == 0: return float('inf')
             new_avg_p_no = new_cost_no / new_qty_no
             new_combined_avg_p = avg_p_yes + new_avg_p_no
         else:
-            return False
+            return float('inf')
+        return new_combined_avg_p
+
+    def check_safety_margin(self, portfolio, target_side, qty_to_buy, price):
+        new_combined_avg_p = self._calculate_new_avg_price(portfolio, target_side, qty_to_buy, price)
         return new_combined_avg_p < self.SAFETY_MARGIN_M
 
     def decide(self, market_data_point, current_capital):
@@ -170,6 +175,18 @@ class HybridStrategy(Strategy):
             target_price = price_no if target_side == 'Down' else price_yes
 
             if target_price <= 0:
+                return None
+
+            qty_to_buy_full = int(quantity_delta)
+            new_combined_avg_p = self._calculate_new_avg_price(portfolio, target_side, qty_to_buy_full, target_price)
+
+            if new_combined_avg_p > self.STOP_LOSS_THRESHOLD:
+                qty_to_buy = qty_to_buy_full
+                cost = qty_to_buy * target_price
+                if cost <= current_capital and \
+                   self.check_delta_constraint(portfolio, target_side, qty_to_buy) and \
+                   self.check_liquidity_constraint(market_data_point, target_side, qty_to_buy):
+                    return (target_side, qty_to_buy, target_price)
                 return None
 
             qty_to_buy = int(min(quantity_delta, current_capital * self.MAX_ALLOCATION_PER_REBALANCE))
