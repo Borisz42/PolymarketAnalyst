@@ -13,7 +13,7 @@ def test_stop_loss_triggered_when_threshold_exceeded():
         'TargetTime': '2023-01-01 12:00:00',
         'Expiration': '2023-01-01 12:15:00',
         'UpAsk': 0.7,
-        'DownAsk': 0.51,  # Price that will trigger the stop loss (0.6 + 0.51 = 1.11 > 1.1)
+        'DownAsk': 0.61,  # Price that will trigger the stop loss (0.6 + 0.61 = 1.21 > 1.2)
         'UpAskLiquidity': 500,
         'DownAskLiquidity': 500,
         'MinuteFromStart': 8,
@@ -41,7 +41,7 @@ def test_normal_rebalance_successful_below_threshold():
         'TargetTime': '2023-01-01 12:00:00',
         'Expiration': '2023-01-01 12:15:00',
         'UpAsk': 0.7,
-        'DownAsk': 0.2,  # Price low enough to pass safety margin (0.6 + ~0.3 < 0.99)
+        'DownAsk': 0.2,  # Price low enough to pass safety margin (0.6 + ~0.3 < 1.0)
         'UpAskLiquidity': 500,
         'DownAskLiquidity': 500,
         'MinuteFromStart': 8,

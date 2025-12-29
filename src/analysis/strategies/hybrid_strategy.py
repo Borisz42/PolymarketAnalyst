@@ -6,8 +6,8 @@ from .base_strategy import Strategy
 class HybridStrategy(Strategy):
     def __init__(self):
         # Parameters from RebalancingStrategy
-        self.SAFETY_MARGIN_M = 0.99
-        self.STOP_LOSS_THRESHOLD = 1.1
+        self.MAX_HEDGING_COST = 1.0
+        self.STOP_LOSS_THRESHOLD = 1.2
         self.MAX_ALLOCATION_PER_REBALANCE = 0.5
         self.MIN_BALANCE_QTY = 1
 
@@ -119,9 +119,9 @@ class HybridStrategy(Strategy):
             return float('inf')
         return new_combined_avg_p
 
-    def check_safety_margin(self, portfolio, target_side, qty_to_buy, price):
+    def _check_hedging_cost_limit(self, portfolio, target_side, qty_to_buy, price):
         new_combined_avg_p = self._calculate_new_avg_price(portfolio, target_side, qty_to_buy, price)
-        return new_combined_avg_p < self.SAFETY_MARGIN_M
+        return new_combined_avg_p < self.MAX_HEDGING_COST
 
     def decide(self, market_data_point, current_capital):
         market_id = (market_data_point['TargetTime'], market_data_point['Expiration'])
@@ -197,7 +197,7 @@ class HybridStrategy(Strategy):
                     continue
                 if self.check_delta_constraint(portfolio, target_side, qty_to_buy) and \
                    self.check_liquidity_constraint(market_data_point, target_side, qty_to_buy) and \
-                   self.check_safety_margin(portfolio, target_side, qty_to_buy, target_price):
+                   self._check_hedging_cost_limit(portfolio, target_side, qty_to_buy, target_price):
                     return (target_side, qty_to_buy, target_price)
                 qty_to_buy -= 1
         return None
