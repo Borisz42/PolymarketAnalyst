@@ -6,7 +6,8 @@ from .base_strategy import Strategy
 class HybridStrategy(Strategy):
     def __init__(self):
         # Parameters from RebalancingStrategy
-        self.SAFETY_MARGIN_M = 0.99
+        self.MAX_HEDGING_COST = 0.99
+        self.STOP_LOSS_THRESHOLD = 1.10
         self.MAX_ALLOCATION_PER_REBALANCE = 0.5
         self.MIN_BALANCE_QTY = 1
 
@@ -96,7 +97,7 @@ class HybridStrategy(Strategy):
             new_delta = current_delta - qty_to_buy
         return abs(new_delta) <= self.MAX_UNHEDGED_DELTA
 
-    def check_safety_margin(self, portfolio, target_side, qty_to_buy, price):
+    def check_hedging_cost_constraint(self, portfolio, target_side, qty_to_buy, price):
         qty_yes, qty_no = portfolio['qty_yes'], portfolio['qty_no']
         cost_yes, cost_no = portfolio['cost_yes'], portfolio['cost_no']
         avg_p_yes = cost_yes / qty_yes if qty_yes > 0 else 0
@@ -116,7 +117,7 @@ class HybridStrategy(Strategy):
             new_combined_avg_p = avg_p_yes + new_avg_p_no
         else:
             return False
-        return new_combined_avg_p < self.SAFETY_MARGIN_M
+        return new_combined_avg_p < self.MAX_HEDGING_COST
 
     def decide(self, market_data_point, current_capital):
         market_id = (market_data_point['TargetTime'], market_data_point['Expiration'])
@@ -172,7 +173,9 @@ class HybridStrategy(Strategy):
             if target_price <= 0:
                 return None
 
+            # First, try to rebalance with the safety margin
             qty_to_buy = int(min(quantity_delta, current_capital * self.MAX_ALLOCATION_PER_REBALANCE))
+            trade = None
             while qty_to_buy > 0:
                 cost = qty_to_buy * target_price
                 if cost > current_capital:
@@ -180,9 +183,36 @@ class HybridStrategy(Strategy):
                     continue
                 if self.check_delta_constraint(portfolio, target_side, qty_to_buy) and \
                    self.check_liquidity_constraint(market_data_point, target_side, qty_to_buy) and \
-                   self.check_safety_margin(portfolio, target_side, qty_to_buy, target_price):
-                    return (target_side, qty_to_buy, target_price)
+                   self.check_hedging_cost_constraint(portfolio, target_side, qty_to_buy, target_price):
+                    trade = (target_side, qty_to_buy, target_price)
+                    break
                 qty_to_buy -= 1
+
+            if trade:
+                return trade
+
+            # If rebalancing with the safety margin fails, try a stop-loss rebalance
+            state = self.calculate_state(portfolio)
+            avg_yes = state['avg_yes']
+            avg_no = state['avg_no']
+
+            stop_loss_triggered = False
+            if target_side == 'Down' and avg_yes + target_price > self.STOP_LOSS_THRESHOLD:
+                stop_loss_triggered = True
+            elif target_side == 'Up' and avg_no + target_price > self.STOP_LOSS_THRESHOLD:
+                stop_loss_triggered = True
+
+            if stop_loss_triggered:
+                qty_to_buy = int(min(quantity_delta, current_capital * self.MAX_ALLOCATION_PER_REBALANCE))
+                while qty_to_buy > 0:
+                    cost = qty_to_buy * target_price
+                    if cost > current_capital:
+                        qty_to_buy -= 1
+                        continue
+                    if self.check_delta_constraint(portfolio, target_side, qty_to_buy) and \
+                       self.check_liquidity_constraint(market_data_point, target_side, qty_to_buy):
+                        return (target_side, qty_to_buy, target_price)
+                    qty_to_buy -= 1
         return None
 
     def update_portfolio(self, market_id, side, quantity, price):
