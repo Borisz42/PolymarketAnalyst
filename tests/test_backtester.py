@@ -57,12 +57,13 @@ def test_pnl_calculation_win():
     backtester = Backtester(initial_capital=100)
     backtester.load_data(TEST_DATA_FILE)
 
-    # This trade is a winner because the 'Down' side resolves to $1.
-    strategy = DummyStrategy(trade_decision=('Down', 10, 0.52))
+    # Market 1 winner is 'Up'. This is a winning trade.
+    strategy = DummyStrategy(trade_decision=('Up', 10, 0.5))
     backtester.run_strategy(strategy)
 
-    # PnL = 10 * (1 - 0.48) = 5.2 (Slippage to 0.48)
-    assert backtester.capital == 105.2
+    # Cost = 10 * 0.55 (with slippage) = 5.5. Capital becomes 94.5.
+    # Win, so capital becomes 94.5 + 10 = 104.5.
+    assert backtester.capital == 104.5
     print("PnL for winning trade calculated correctly.")
 
 def test_pnl_calculation_loss():
@@ -70,12 +71,13 @@ def test_pnl_calculation_loss():
     backtester = Backtester(initial_capital=100)
     backtester.load_data(TEST_DATA_FILE)
 
-    # This trade is a loser because the 'Up' side resolves to $0.
-    strategy = DummyStrategy(trade_decision=('Up', 10, 0.5))
+    # Market 1 winner is 'Up'. This is a losing trade.
+    strategy = DummyStrategy(trade_decision=('Down', 10, 0.52))
     backtester.run_strategy(strategy)
 
-    # PnL = 10 * (0 - 0.55) = -5.5 (Slippage to 0.55)
-    assert backtester.capital == 94.5
+    # Cost = 10 * 0.48 (with slippage) = 4.8. Capital becomes 95.2.
+    # Loss, so capital remains 95.2.
+    assert backtester.capital == 95.2
     print("PnL for losing trade calculated correctly.")
 
 def test_no_future_data_for_slippage():
@@ -133,8 +135,8 @@ def test_multiple_markets():
     market2_id = (pd.to_datetime('2025-12-26 11:00:00+00:00'), pd.to_datetime('2025-12-26 11:00:00+00:00'))
 
     decisions = {
-        market1_id: ('Down', 10, 0.52),
-        market2_id: ('Up', 10, 0.45)
+        market1_id: ('Up', 10, 0.5), # Win
+        market2_id: ('Down', 10, 0.52) # Win
     }
 
     backtester = Backtester(initial_capital=100)
@@ -142,7 +144,11 @@ def test_multiple_markets():
     strategy = MultiMarketDummyStrategy(decisions)
     backtester.run_strategy(strategy)
 
-    assert backtester.capital == 110.7
+    # M1: Win -> Capital becomes 104.5
+    # M2: Trade at 10:45:14, slippage to 10:45:16, DownAsk is 0.58.
+    # Cost = 10 * 0.58 = 5.8. Capital becomes 104.5 - 5.8 = 98.7
+    # Win, so capital becomes 98.7 + 10 = 108.7
+    assert round(backtester.capital, 2) == 108.7
     print("Multiple markets correctly handled.")
 
 def test_trade_at_expiration():

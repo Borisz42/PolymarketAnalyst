@@ -62,15 +62,19 @@ class Backtester:
         last_dp = market_specific_data[-1] # The final state of the market
 
         winning_side = None
-        # In Polymarket, the winning contract resolves to $1, the loser to $0.
-        # We check the ask price at resolution time.
-        up_ask = last_dp.get('UpAsk', 0)
-        down_ask = last_dp.get('DownAsk', 0)
+        # In Polymarket, when a side is certain to win, its Ask price becomes 0
+        # because you can no longer buy it. The original logic correctly handles this.
+        up_ask = last_dp.get('UpAsk', last_dp.get('UpPrice', 0))
+        down_ask = last_dp.get('DownAsk', last_dp.get('DownPrice', 0))
         
-        if up_ask > down_ask: # e.g., UpAsk is ~1.0, DownAsk is ~0.0
+        if up_ask == 0:
             winning_side = 'Up'
-        else: # e.g., DownAsk is ~1.0, UpAsk is ~0.0
+        elif down_ask == 0:
             winning_side = 'Down'
+        elif down_ask > up_ask:
+            winning_side = 'Down'
+        else:
+            winning_side = 'Up'
         
         pnl = 0
 
