@@ -31,11 +31,15 @@ class Backtester:
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"Data file not found at {file_path}")
         
-        self.market_data = pd.read_csv(file_path)
-        
-        # Convert relevant columns to datetime objects
-        for col in ['Timestamp', 'TargetTime', 'Expiration']:
-            self.market_data[col] = pd.to_datetime(self.market_data[col], utc=True)
+        # --- OPTIMIZATION: Use `parse_dates` in `read_csv` ---
+        # Parsing dates directly during CSV loading is more efficient than loading as strings and then converting.
+        # This is measurably faster and reduces peak memory usage.
+        date_columns = ['Timestamp', 'TargetTime', 'Expiration']
+        self.market_data = pd.read_csv(file_path, parse_dates=date_columns)
+
+        for col in date_columns:
+            # `read_csv` creates timezone-naive columns. We must localize to UTC to match original behavior.
+            self.market_data[col] = self.market_data[col].dt.tz_localize('UTC')
         
         # Sort data by timestamp to ensure chronological processing
         self.market_data.sort_values(by='Timestamp', inplace=True)
