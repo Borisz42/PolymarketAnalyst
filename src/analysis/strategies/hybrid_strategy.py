@@ -7,7 +7,7 @@ class HybridStrategy(Strategy):
     def __init__(self):
         # Parameters from RebalancingStrategy
         self.MAX_HEDGING_COST = 0.99
-        self.STOP_LOSS_THRESHOLD = 1.10
+        self.STOP_LOSS_THRESHOLD = 1.20
         self.MAX_ALLOCATION_PER_REBALANCE = 0.5
         self.MIN_BALANCE_QTY = 1
 
@@ -197,9 +197,9 @@ class HybridStrategy(Strategy):
             avg_no = state['avg_no']
 
             stop_loss_triggered = False
-            if target_side == 'Down' and avg_yes + target_price > self.STOP_LOSS_THRESHOLD:
+            if target_side == 'Down' and avg_yes + target_price >= self.STOP_LOSS_THRESHOLD:
                 stop_loss_triggered = True
-            elif target_side == 'Up' and avg_no + target_price > self.STOP_LOSS_THRESHOLD:
+            elif target_side == 'Up' and avg_no + target_price >= self.STOP_LOSS_THRESHOLD:
                 stop_loss_triggered = True
 
             if stop_loss_triggered:
