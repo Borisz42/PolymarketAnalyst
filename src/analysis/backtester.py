@@ -45,12 +45,12 @@ class Backtester:
         # Sort data by timestamp to ensure chronological processing
         self.market_data.sort_values(by='Timestamp', inplace=True)
 
-        # Group data by market identifier for easier lookup during resolution
-        for _, row in self.market_data.iterrows():
-            market_id = (row['TargetTime'], row['Expiration'])
-            if market_id not in self.market_history:
-                self.market_history[market_id] = []
-            self.market_history[market_id].append(row)
+        # --- OPTIMIZATION: Use `groupby` instead of `iterrows` ---
+        # Using a vectorized `groupby` operation is significantly faster for grouping data
+        # than iterating through rows with `iterrows()`. This creates a dictionary
+        # mapping each market ID to its corresponding DataFrame slice.
+        grouped_by_market = self.market_data.groupby(['TargetTime', 'Expiration'])
+        self.market_history = {market_id: group for market_id, group in grouped_by_market}
 
         print(f"Loaded {len(self.market_data)} data points from {file_path}")
 
@@ -60,7 +60,8 @@ class Backtester:
             return {'pnl': 0, 'winning_side': 'Error'} 
 
         market_specific_data = self.market_history[market_id_tuple]
-        last_dp = market_specific_data[-1] # The final state of the market
+        # Get the last row of the market-specific DataFrame
+        last_dp = market_specific_data.iloc[-1] # The final state of the market
 
         winning_side = None
         # In Polymarket, when a side is certain to win, its Ask price becomes 0
