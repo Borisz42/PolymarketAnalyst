@@ -13,25 +13,6 @@ def get_winning_side(market_data):
     return 'Up' if final_row['UpMid'] > final_row['DownMid'] else 'Down'
 
 
-def get_confidence_score(market_data_point):
-    """Calculates a confidence score based on the PredictionStrategy's logic."""
-    up_score = 0
-    down_score = 0
-
-    # Signal 1: Price Delta
-    if market_data_point["UpMidDelta"] > 0:
-        up_score += 1
-    if market_data_point["DownMidDelta"] > 0:
-        down_score += 1
-
-    # Signal 2: Liquidity Imbalance
-    if market_data_point["BidLiquidityImbalance"] > 0:
-        up_score += 1
-    elif market_data_point["BidLiquidityImbalance"] < 0:
-        down_score += 1
-
-    return abs(up_score - down_score)
-
 def analyze_signals():
     """Analyzes the accuracy of the PredictionStrategy's signals."""
     # Load and preprocess data
@@ -50,8 +31,10 @@ def analyze_signals():
     # Instantiate the strategy
     strategy = PredictionStrategy()
 
-    correct_signals = 0
-    total_signals = 0
+    # Data structure to hold accuracy stats
+    # { ('Up', 1): {'correct': 0, 'total': 0}, ... }
+    signal_stats = {}
+
     mock_capital = 10000
 
     # Group data by market
@@ -63,20 +46,44 @@ def analyze_signals():
         for _, row in market_data.iterrows():
             decision = strategy.decide(row, mock_capital)
             if decision:
-                signal, _, _ = decision
-                confidence = get_confidence_score(row)
-                total_signals += 1
-                if signal == winning_side:
-                    correct_signals += 1
-                print(f"Signal: {signal}, Confidence: {confidence}, Winning Side: {winning_side}, Correct: {signal == winning_side}")
+                signal, _, _, score = decision
+                key = (signal, int(score))
 
-    # Print summary
-    accuracy = correct_signals / total_signals if total_signals > 0 else 0
+                if key not in signal_stats:
+                    signal_stats[key] = {'correct': 0, 'total': 0}
+
+                signal_stats[key]['total'] += 1
+                if signal == winning_side:
+                    signal_stats[key]['correct'] += 1
+
+    # --- Print summary ---
     print(f"\n--- Signal Accuracy Report ---")
+
+    total_correct = 0
+    total_signals = 0
+
+    # Sort by signal type, then strength
+    sorted_keys = sorted(signal_stats.keys(), key=lambda x: (x[0], x[1]))
+
+    for key in sorted_keys:
+        stats = signal_stats[key]
+        signal_type, signal_strength = key
+        accuracy = stats['correct'] / stats['total'] if stats['total'] > 0 else 0
+        total_correct += stats['correct']
+        total_signals += stats['total']
+
+        print(f"  Signal: {signal_type}, Strength: {signal_strength}")
+        print(f"    Correct: {stats['correct']} / {stats['total']}")
+        print(f"    Accuracy: {accuracy:.2%}\n")
+
+
+    # Overall Accuracy
+    overall_accuracy = total_correct / total_signals if total_signals > 0 else 0
+    print(f"--- Overall Summary ---")
     print(f"Total Signals: {total_signals}")
-    print(f"Correct Signals: {correct_signals}")
-    print(f"Accuracy: {accuracy:.2%}")
-    print(f"------------------------------")
+    print(f"Correct Signals: {total_correct}")
+    print(f"Overall Accuracy: {overall_accuracy:.2%}")
+    print(f"-----------------------")
 
 if __name__ == "__main__":
     analyze_signals()

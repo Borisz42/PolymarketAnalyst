@@ -14,7 +14,7 @@ def test_stop_loss_rebalance_triggered(strategy):
         'TargetTime': '2023-01-01 12:00:00',
         'Expiration': '2023-01-01 12:15:00',
         'UpAsk': 0.4,
-        'DownAsk': 0.6,
+        'DownAsk': 0.7,
         'UpAskLiquidity': 200,
         'DownAskLiquidity': 200,
         'UpMidDelta': 0.01,
@@ -29,9 +29,11 @@ def test_stop_loss_rebalance_triggered(strategy):
     decision = strategy.decide(market_data, 1000)
 
     assert decision is not None
+    assert len(decision) == 4
     assert decision[0] == 'Down'
     assert decision[1] > 0
-    assert decision[2] == 0.6
+    assert decision[2] == 0.7
+    assert decision[3] == 0
 
 def test_stop_loss_not_triggered(strategy):
     # Initial trade to create an imbalance
@@ -57,6 +59,8 @@ def test_stop_loss_not_triggered(strategy):
     decision = strategy.decide(market_data, 1000)
 
     assert decision is not None
+    assert len(decision) == 4
     assert decision[0] == 'Down'
     assert decision[1] > 0
     assert decision[2] == 0.4
+    assert decision[3] == 0
