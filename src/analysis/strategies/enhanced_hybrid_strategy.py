@@ -22,7 +22,7 @@ class ConservativeStrategy(Strategy):
         self.PRICE_DELTA_WEIGHT = 1.0
         self.LIQUIDITY_IMBALANCE_WEIGHT = 1.0
         self.MIN_SCORE_THRESHOLD = 1
-        self.LIQUIDITY_IMBALANCE_THRESHOLD = 20000
+        self.LIQUIDITY_IMBALANCE_THRESHOLD = 5000
 
         # Portfolio state per market
         self.portfolio_state = {}
@@ -34,14 +34,15 @@ class ConservativeStrategy(Strategy):
 
     def _get_signal(self, market_data_point):
         if not market_data_point["SharpEvent"]:
-            return None
+            return None, 0
 
-        if market_data_point["BidLiquidityImbalance"] > self.LIQUIDITY_IMBALANCE_THRESHOLD:
-            return "Up"
-        elif market_data_point["BidLiquidityImbalance"] < -self.LIQUIDITY_IMBALANCE_THRESHOLD:
-            return "Down"
+        imbalance = market_data_point["BidLiquidityImbalance"]
+        if imbalance > self.LIQUIDITY_IMBALANCE_THRESHOLD:
+            return "Up", imbalance
+        elif imbalance < -self.LIQUIDITY_IMBALANCE_THRESHOLD:
+            return "Down", imbalance
 
-        return None
+        return None, 0
 
     def calculate_state(self, portfolio):
         qty_yes = portfolio['qty_yes']
@@ -127,7 +128,7 @@ class ConservativeStrategy(Strategy):
             if minute is None or not (self.MIN_MINUTE <= minute <= self.MAX_MINUTE):
                 return None
 
-            side = self._get_signal(market_data_point)
+            side, score = self._get_signal(market_data_point)
             if not side:
                 return None
 
@@ -138,6 +139,10 @@ class ConservativeStrategy(Strategy):
 
             trade_capital = current_capital * self.MAX_ALLOCATION_PER_TRADE
             quantity = math.floor(trade_capital / ask_price)
+
+            # Enforce the MAX_UNHEDGED_DELTA constraint for the initial trade
+            if quantity > self.MAX_UNHEDGED_DELTA:
+                quantity = int(self.MAX_UNHEDGED_DELTA)
 
             if quantity == 0:
                 return None
@@ -156,7 +161,7 @@ class ConservativeStrategy(Strategy):
             if ask_price + hedge_price > self.MAX_HEDGING_COST:
                 return None # Too expensive to hedge
 
-            return (side, quantity, ask_price, 0) # Return 0 for score as it's not used here
+            return (side, quantity, ask_price, score)
 
         # Use rebalancing logic to manage the position
         if qty_yes != qty_no:
