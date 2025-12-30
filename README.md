@@ -104,9 +104,18 @@ INITIAL_CAPITAL = 1000.0
     python -m src.data_collection.data_logger
     ```
 2.  **Run a backtest:**
-    ```bash
-    python -m src.analysis.backtester
-    ```
+    -   **Rebalancing Strategy:**
+        ```bash
+        python -m src.analysis.backtester
+        ```
+    -   **Prediction Strategy:**
+        ```bash
+        python -m src.analysis.prediction_backtester
+        ```
+    -   **Hybrid Strategy:**
+        ```bash
+        python -m src.analysis.hybrid_backtester
+        ```
 3.  **Launch the dashboard:**
     ```bash
     streamlit run src/dashboard/dashboard.py
