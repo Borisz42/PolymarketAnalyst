@@ -2,6 +2,7 @@ import src.config as config
 import pandas as pd
 import datetime
 import os
+import time
 from collections import deque
 from decimal import Decimal
 
@@ -229,14 +230,27 @@ class Backtester:
     def run_strategy(self, strategy_instance):
         current_timestamp = None
         unique_timestamps = self.market_data['Timestamp'].unique()
-        
-        for ts_np in unique_timestamps:
+        n_unique_timestamps = len(unique_timestamps)
+        start_time = time.time()
+
+        print("Running backtest...")
+        for i, ts_np in enumerate(unique_timestamps):
             current_timestamp = pd.to_datetime(ts_np)
-            
+
+            # Progress logging
+            if n_unique_timestamps > 20 and (i + 1) % (n_unique_timestamps // 20) == 0:
+                elapsed_time = time.time() - start_time
+                progress = (i + 1) / n_unique_timestamps
+                eta = (elapsed_time / progress) * (1 - progress) if progress > 0 else 0
+
+                print(f"\r  -> Progress: {progress:.0%}, "
+                      f"Elapsed: {datetime.timedelta(seconds=int(elapsed_time))}, "
+                      f"ETA: {datetime.timedelta(seconds=int(eta))}", end="")
+
             positions_to_remove_indices = []
             
             # Process open positions for expiration at current_timestamp or earlier
-            for i, position in enumerate(self.open_positions):
+            for pos_index, position in enumerate(self.open_positions):
                 if current_timestamp >= position['expiration']:
                     market_id_tuple = position['market_id']
                     
@@ -246,7 +260,7 @@ class Backtester:
                         self.pending_market_summaries[market_id_tuple] = []
                     self.pending_market_summaries[market_id_tuple].append(resolved_info)
                     
-                    positions_to_remove_indices.append(i)
+                    positions_to_remove_indices.append(pos_index)
             
             # Remove resolved positions from self.open_positions
             if positions_to_remove_indices:
