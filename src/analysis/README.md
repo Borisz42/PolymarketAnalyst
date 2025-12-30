@@ -49,10 +49,11 @@ The backtester is designed to be easily extensible. You can create your own trad
 
     Your `decide()` method should return one of two things:
     -   `None`: If no action should be taken.
-    -   A `tuple`: `(side, quantity, entry_price)` if you want to execute a trade.
+    -   A `tuple`: `(side, quantity, price, score)` if you want to execute a trade.
         -   `side` (str): Either `'Up'` or `'Down'`.
         -   `quantity` (float): The number of shares to buy.
-        -   `entry_price` (float): The price at which to buy the shares (e.g., `data_point['UpAsk']`).
+        -   `price` (float): The price at which to buy the shares (e.g., `data_point['UpAsk']`).
+        -   `score` (float): A score representing the signal strength (can be 0 if not used).
 
 4.  **Example Implementation**:
 
@@ -64,32 +65,18 @@ The backtester is designed to be easily extensible. You can create your own trad
         def __init__(self):
             super().__init__()
 
-        def decide(self, data_point, capital):
+        def decide(self, market_data_point, current_capital):
             # A simple strategy: buy 10 UP shares if the ask price is below $0.50
-            if data_point['UpAsk'] < 0.50:
+            if market_data_point['UpAsk'] < 0.50:
                 quantity_to_buy = 10.0
-                cost = quantity_to_buy * data_point['UpAsk']
-                if capital >= cost:
-                    return ('Up', quantity_to_buy, data_point['UpAsk'])
+                cost = quantity_to_buy * market_data_point['UpAsk']
+                if current_capital >= cost:
+                    return ('Up', quantity_to_buy, market_data_point['UpAsk'], 1.0)
             return None
     ```
 
-5.  **Run the Backtester**: To run the backtester with your new strategy, you can modify the main execution block in `src/analysis/backtester.py` to import and instantiate your strategy.
+5.  **Run the Backtester**: To run the backtester with your new strategy, use the `hybrid_backtester.py` script, which is designed to run any strategy. You will need to modify it to import and instantiate your strategy.
 
-    ```python
-    # In src/analysis/backtester.py
-    if __name__ == "__main__":
-        # from .strategies.rebalancing_strategy import RebalancingStrategy
-        from .strategies.my_strategy import MyStrategy # Import your new strategy
-
-        backtester = Backtester(initial_capital=INITIAL_CAPITAL)
-        try:
-            backtester.load_data(DATA_FILE)
-        except FileNotFoundError as e:
-            print(e)
-            exit()
-
-        strategy = MyStrategy() # Instantiate your strategy
-        backtester.run_strategy(strategy)
-        backtester.generate_report()
+    ```bash
+    python -m src.analysis.hybrid_backtester my_strategy <path_to_data_file>
     ```

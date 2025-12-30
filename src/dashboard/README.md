@@ -20,9 +20,9 @@ The dashboard consists of four main charts, arranged vertically and sharing a co
 
 ### 1. Pair Cost
 
--   **Purpose**: This is the most critical chart for identifying trading opportunities with the `RebalancingStrategy`.
+-   **Purpose**: This chart is critical for identifying arbitrage opportunities.
 -   **What it Shows**: It plots the combined cost of buying one "Up" contract and one "Down" contract at their current ask prices (`UpAsk + DownAsk`).
--   **How to Interpret**: A contract pair will always resolve to be worth exactly $1.00. Therefore, any time the `PairCost` drops below $1.00, it represents a potential arbitrage opportunity. The dashboard includes a horizontal line at the `$0.98` level to highlight these profitable entry points.
+-   **How to Interpret**: A contract pair will always resolve to be worth exactly $1.00. Therefore, any time the `PairCost` drops below $1.00, it represents a potential trading opportunity. The dashboard includes a horizontal line at the `$0.98` level to highlight these entry points.
 
 ### 2. Ask Prices (UP vs DOWN)
 
@@ -38,6 +38,6 @@ The dashboard consists of four main charts, arranged vertically and sharing a co
 
 ### 4. Liquidity Imbalance
 
--   **Purpose**: This chart is a key indicator for the `PredictionStrategy`, as it highlights potential short-term price movements.
+-   **Purpose**: This chart highlights potential short-term price movements by showing imbalances in market liquidity.
 -   **What it Shows**: It displays a bar chart representing the ratio of "Up" to "Down" ask liquidity. A positive bar indicates more liquidity on the "Up" side, while a negative bar indicates more liquidity on the "Down" side.
 -   **How to Interpret**: A significant imbalance can signal that market makers are trying to encourage trading in a particular direction. For example, a large negative bar (high "Down" liquidity) might suggest that a sharp move upwards is anticipated, and vice versa.

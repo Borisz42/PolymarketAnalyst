@@ -65,7 +65,7 @@ You may need to install pytest first: `pip install pytest`.
 ### `RebalancingStrategy`
 
 -   **Objective**: To accumulate paired positions (both UP and DOWN) when profitable opportunities arise.
--   **Logic**: It seeks to maintain a balanced portfolio. When the portfolio is balanced, it looks for opportunities to buy a pair of UP and DOWN contracts where the combined cost is less than $1.00 (controlled by `SAFETY_MARGIN_M`). When unbalanced, it seeks to buy the contract that will bring the portfolio back to a balanced state.
+-   **Logic**: It seeks to maintain a balanced portfolio. When the portfolio is balanced, it looks for opportunities to buy a pair of UP and DOWN contracts where the combined cost is less than $1.00 (controlled by `MAX_HEDGING_COST`). When unbalanced, it seeks to buy the contract that will bring the portfolio back to a balanced state.
 -   **Constraints**: It incorporates several risk management constraints, including `MAX_UNHEDGED_DELTA`, `MIN_LIQUIDITY_MULTIPLIER`, and `MAX_TRADE_SIZE`.
 
 ### `PredictionStrategy`

@@ -79,6 +79,6 @@ python -m src.analysis.analyze_prices
     *   All strategies are located in the `src/analysis/strategies/` directory.
     *   Each strategy should be in its own file and inherit from the `Strategy` base class in `src/analysis/strategies/base_strategy.py`.
     *   To test a new strategy, create a new runner script in `src/analysis/` similar to `prediction_backtester.py`.
-*   **Dependencies:** Project dependencies are managed in `requirements.txt`. To install them, run `pip install -r requirements.txt`. The dependencies are: `pandas`, `streamlit`, `pytest`, and `requests`.
+*   **Dependencies:** Project dependencies are managed in `requirements.txt`. To install them, run `pip install -r requirements.txt`. The dependencies are: `pandas`, `streamlit`, `pytest`, `requests`, `matplotlib`, and `seaborn`.
 *   **Imports:** Scripts in `src/analysis` that are intended to be run as standalone modules should use absolute imports (e.g., `from src.analysis...`) rather than relative imports to avoid `ImportError`.
 *   **Agent Instructions:** For specific instructions on developing for this project as an AI agent, please refer to `AGENTS.md`.

@@ -104,18 +104,12 @@ INITIAL_CAPITAL = 1000.0
     python -m src.data_collection.data_logger
     ```
 2.  **Run a backtest:**
-    -   **Rebalancing Strategy:**
-        ```bash
-        python -m src.analysis.backtester
-        ```
-    -   **Prediction Strategy:**
-        ```bash
-        python -m src.analysis.prediction_backtester
-        ```
-    -   **Hybrid Strategy:**
-        ```bash
-        python -m src.analysis.hybrid_backtester
-        ```
+    ```bash
+    python -m src.analysis.hybrid_backtester <strategy_name> <data_file_path>
+    ```
+    - `<strategy_name>`: The name of the strategy to test (e.g., `hybrid`, `rebalancing`, `prediction`).
+    - `<data_file_path>`: The path to the market data CSV file.
+
 3.  **Launch the dashboard:**
     ```bash
     streamlit run src/dashboard/dashboard.py
@@ -154,7 +148,7 @@ The data logger captures comprehensive order book data in date-stamped CSV files
 To run the test suite, use the following command from the root directory:
 
 ```bash
-pytest
+python -m pytest
 ```
 
 ## Contributing
