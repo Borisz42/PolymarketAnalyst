@@ -7,7 +7,7 @@ class HybridStrategy(Strategy):
     def __init__(self):
         # Parameters from RebalancingStrategy
         self.MAX_HEDGING_COST = 0.98
-        self.STOP_LOSS_THRESHOLD = 1.30
+        self.STOP_LOSS_THRESHOLD = 1.25
         self.MAX_ALLOCATION_PER_REBALANCE = 0.5
         self.MIN_BALANCE_QTY = 1
 
@@ -18,7 +18,7 @@ class HybridStrategy(Strategy):
         # Parameters from PredictionStrategy
         self.MIN_MINUTE = 2
         self.MAX_MINUTE = 7
-        self.MAX_ALLOCATION_PER_TRADE = 0.05
+        self.MAX_ALLOCATION_PER_TRADE = 0.075
         self.PRICE_DELTA_WEIGHT = 1.0
         self.LIQUIDITY_IMBALANCE_WEIGHT = 1.0
         self.MIN_SCORE_THRESHOLD = 1
