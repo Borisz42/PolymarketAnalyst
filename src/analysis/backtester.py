@@ -239,7 +239,7 @@ class Backtester:
             current_timestamp = pd.to_datetime(ts_np)
 
             # Progress logging
-            if n_unique_timestamps > 20 and (i + 1) % (n_unique_timestamps // 20) == 0:
+            if n_unique_timestamps > 50 and (i + 1) % (n_unique_timestamps // 50) == 0:
                 elapsed_time = time.time() - start_time
                 progress = (i + 1) / n_unique_timestamps
                 eta = (elapsed_time / progress) * (1 - progress) if progress > 0 else 0
