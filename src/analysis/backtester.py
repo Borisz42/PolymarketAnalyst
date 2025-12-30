@@ -284,7 +284,7 @@ class Backtester:
                     if current_timestamp >= row['Expiration']:
                         continue
 
-                    side, quantity, entry_price, score = trade_decision
+                    side, quantity, entry_price, _ = trade_decision # Unpack the score, but ignore it
 
                     entry_price = self._apply_slippage(current_timestamp, market_id_tuple, side, entry_price)
 
@@ -311,8 +311,7 @@ class Backtester:
                             'Quantity': quantity,
                             'EntryPrice': entry_price,
                             'Value': cost,
-                            'PnL': -cost,
-                            'Score': score
+                            'PnL': -cost
                         })
                     else:
                         # Track liquidity/capital constraint events

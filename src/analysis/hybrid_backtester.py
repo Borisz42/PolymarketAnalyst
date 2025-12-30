@@ -1,10 +1,9 @@
-import argparse
 import src.config as config
 from .backtester import Backtester
 from .strategies.hybrid_strategy import HybridStrategy
-from .strategies.enhanced_hybrid_strategy import ConservativeStrategy
 
 # CONFIG
+DATA_FILE = config.get_analysis_filename()
 SHARP_MOVE_THRESHOLD = 0.04
 
 def preprocess_data(df, sharp_move_threshold=SHARP_MOVE_THRESHOLD):
@@ -31,29 +30,21 @@ def preprocess_data(df, sharp_move_threshold=SHARP_MOVE_THRESHOLD):
         (df["DownMidDelta"].abs() >= sharp_move_threshold)
     )
 
+    # --- Signal Generation: Moved to PredictionStrategy ---
+    # The strategy now calculates the signal internally.
+
     return df
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run the backtester with a specific strategy and data file.")
-    parser.add_argument("strategy", type=str, choices=["hybrid", "conservative"], help="The strategy to run.")
-    parser.add_argument("data_file", type=str, help="Path to the market data CSV file.")
-    args = parser.parse_args()
-
-    # Instantiate the selected strategy
-    if args.strategy == "hybrid":
-        strategy = HybridStrategy()
-    elif args.strategy == "conservative":
-        strategy = ConservativeStrategy()
-    else:
-        print(f"Unknown strategy: {args.strategy}")
-        exit()
+    # Instantiate the strategy
+    strategy = HybridStrategy()
 
     # Instantiate the backtester
     backtester = Backtester(initial_capital=config.INITIAL_CAPITAL)
 
     # Load data
     try:
-        backtester.load_data(args.data_file)
+        backtester.load_data(DATA_FILE)
     except FileNotFoundError as e:
         print(e)
         exit()
