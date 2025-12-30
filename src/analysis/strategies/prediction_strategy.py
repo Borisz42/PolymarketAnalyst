@@ -30,13 +30,16 @@ class PredictionStrategy(Strategy):
             down_score += self.LIQUIDITY_IMBALANCE_WEIGHT
 
         side = None
+        score = 0
 
         if up_score >= self.MIN_SCORE_THRESHOLD:
             side = "Up"
+            score = up_score
         elif down_score >= self.MIN_SCORE_THRESHOLD:
             side = "Down"
+            score = down_score
 
-        return side
+        return side, score
 
     def decide(self, market_data_point, current_capital):
         # We assume the dataframe passed to the backtester is pre-processed with these columns.
@@ -56,7 +59,7 @@ class PredictionStrategy(Strategy):
             return None
 
         # --- Decision based on pre-calculated signal ---
-        side = self._get_signal(market_data_point)
+        side, score = self._get_signal(market_data_point)
 
         if not side:
             return None
@@ -88,4 +91,4 @@ class PredictionStrategy(Strategy):
             return None
 
         # ===== DECISION: ENTER TRADE =====
-        return (side, quantity, ask_price)
+        return (side, quantity, ask_price, score)

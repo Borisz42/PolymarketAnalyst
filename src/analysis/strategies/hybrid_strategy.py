@@ -157,7 +157,7 @@ class HybridStrategy(Strategy):
             cost = quantity * ask_price
             if cost > current_capital:
                 return None
-            return (side, quantity, ask_price)
+            return (side, quantity, ask_price, 0) # Return 0 for score as it's not used here
 
         # Use rebalancing logic to manage the position
         if qty_yes != qty_no:
@@ -184,7 +184,7 @@ class HybridStrategy(Strategy):
                 if self.check_delta_constraint(portfolio, target_side, qty_to_buy) and \
                    self.check_liquidity_constraint(market_data_point, target_side, qty_to_buy) and \
                    self.check_hedging_cost_constraint(portfolio, target_side, qty_to_buy, target_price):
-                    trade = (target_side, qty_to_buy, target_price)
+                    trade = (target_side, qty_to_buy, target_price, 0) # Return 0 for score
                     break
                 qty_to_buy -= 1
 
@@ -211,7 +211,7 @@ class HybridStrategy(Strategy):
                         continue
                     if self.check_delta_constraint(portfolio, target_side, qty_to_buy) and \
                        self.check_liquidity_constraint(market_data_point, target_side, qty_to_buy):
-                        return (target_side, qty_to_buy, target_price)
+                        return (target_side, qty_to_buy, target_price, 0) # Return 0 for score
                     qty_to_buy -= 1
         return None
 

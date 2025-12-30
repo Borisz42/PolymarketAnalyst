@@ -17,7 +17,11 @@ def test_load_data():
 
 class DummyStrategy(Strategy):
     def __init__(self, trade_decision):
-        self.trade_decision = trade_decision
+        # Append a dummy score of 0 if the decision is not None
+        if trade_decision:
+            self.trade_decision = trade_decision + (0,)
+        else:
+            self.trade_decision = None
         self.has_traded = False
 
     def decide(self, data_point, capital):
@@ -135,8 +139,8 @@ def test_multiple_markets():
     market2_id = (pd.to_datetime('2025-12-26 11:00:00+00:00'), pd.to_datetime('2025-12-26 11:00:00+00:00'))
 
     decisions = {
-        market1_id: ('Up', 10, 0.5), # Win
-        market2_id: ('Down', 10, 0.52) # Win
+        market1_id: ('Up', 10, 0.5, 0), # Win
+        market2_id: ('Down', 10, 0.52, 0) # Win
     }
 
     backtester = Backtester(initial_capital=100)
@@ -171,7 +175,7 @@ def test_trade_at_expiration():
 
     expiration_time = pd.to_datetime('2025-12-26 10:45:00+00:00')
 
-    strategy = ExpirationDummyStrategy(trade_decision=('Up', 10, 0.5), trade_timestamp=expiration_time)
+    strategy = ExpirationDummyStrategy(trade_decision=('Up', 10, 0.5, 0), trade_timestamp=expiration_time)
     backtester.run_strategy(strategy)
 
     assert len(backtester.transactions) == 0
