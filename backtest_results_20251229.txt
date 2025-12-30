@@ -1,0 +1,30 @@
+Loaded 47075 data points from data/market_data_20251229.csv
+Running backtest...
+  -> Progress: 2%, Elapsed: 0:00:01, ETA: 0:00:52  -> Progress: 4%, Elapsed: 0:00:02, ETA: 0:00:49  -> Progress: 6%, Elapsed: 0:00:03, ETA: 0:00:49  -> Progress: 8%, Elapsed: 0:00:04, ETA: 0:00:48  -> Progress: 10%, Elapsed: 0:00:05, ETA: 0:00:46  -> Progress: 12%, Elapsed: 0:00:06, ETA: 0:00:46  -> Progress: 14%, Elapsed: 0:00:07, ETA: 0:00:45  -> Progress: 16%, Elapsed: 0:00:08, ETA: 0:00:43  -> Progress: 18%, Elapsed: 0:00:09, ETA: 0:00:42  -> Progress: 20%, Elapsed: 0:00:10, ETA: 0:00:41  -> Progress: 22%, Elapsed: 0:00:11, ETA: 0:00:40  -> Progress: 24%, Elapsed: 0:00:12, ETA: 0:00:39  -> Progress: 26%, Elapsed: 0:00:13, ETA: 0:00:38  -> Progress: 28%, Elapsed: 0:00:14, ETA: 0:00:37  -> Progress: 30%, Elapsed: 0:00:15, ETA: 0:00:36  -> Progress: 32%, Elapsed: 0:00:16, ETA: 0:00:35  -> Progress: 34%, Elapsed: 0:00:17, ETA: 0:00:33  -> Progress: 36%, Elapsed: 0:00:18, ETA: 0:00:32  -> Progress: 38%, Elapsed: 0:00:19, ETA: 0:00:31  -> Progress: 40%, Elapsed: 0:00:20, ETA: 0:00:30  -> Progress: 42%, Elapsed: 0:00:21, ETA: 0:00:29  -> Progress: 44%, Elapsed: 0:00:22, ETA: 0:00:28  -> Progress: 46%, Elapsed: 0:00:23, ETA: 0:00:27  -> Progress: 48%, Elapsed: 0:00:24, ETA: 0:00:26  -> Progress: 50%, Elapsed: 0:00:25, ETA: 0:00:25  -> Progress: 52%, Elapsed: 0:00:26, ETA: 0:00:24  -> Progress: 54%, Elapsed: 0:00:27, ETA: 0:00:23  -> Progress: 56%, Elapsed: 0:00:28, ETA: 0:00:22  -> Progress: 58%, Elapsed: 0:00:29, ETA: 0:00:21  -> Progress: 60%, Elapsed: 0:00:30, ETA: 0:00:20  -> Progress: 62%, Elapsed: 0:00:32, ETA: 0:00:19  -> Progress: 64%, Elapsed: 0:00:33, ETA: 0:00:18  -> Progress: 66%, Elapsed: 0:00:34, ETA: 0:00:17  -> Progress: 68%, Elapsed: 0:00:35, ETA: 0:00:16  -> Progress: 70%, Elapsed: 0:00:36, ETA: 0:00:15  -> Progress: 72%, Elapsed: 0:00:37, ETA: 0:00:14  -> Progress: 74%, Elapsed: 0:00:38, ETA: 0:00:13  -> Progress: 76%, Elapsed: 0:00:39, ETA: 0:00:12  -> Progress: 78%, Elapsed: 0:00:40, ETA: 0:00:11  -> Progress: 80%, Elapsed: 0:00:41, ETA: 0:00:10  -> Progress: 82%, Elapsed: 0:00:42, ETA: 0:00:09  -> Progress: 84%, Elapsed: 0:00:43, ETA: 0:00:08  -> Progress: 86%, Elapsed: 0:00:44, ETA: 0:00:07  -> Progress: 88%, Elapsed: 0:00:45, ETA: 0:00:06  -> Progress: 90%, Elapsed: 0:00:46, ETA: 0:00:05  -> Progress: 92%, Elapsed: 0:00:47, ETA: 0:00:04  -> Progress: 94%, Elapsed: 0:00:48, ETA: 0:00:03  -> Progress: 96%, Elapsed: 0:00:49, ETA: 0:00:02  -> Progress: 98%, Elapsed: 0:00:50, ETA: 0:00:01  -> Progress: 100%, Elapsed: 0:00:52, ETA: 0:00:00
+--- Market Resolution Summary for (2025-12-29 15:30:00, 2025-12-29 15:45:00) ---
+Total PnL for market: $4.41
+Up Shares: 147, Avg Entry Price: $0.44
+Down Shares: 147, Avg Entry Price: $0.53
+Portfolio Value After Resolution: $1004.41
+Execution Stats:
+  Total Trades: 2
+  Avg Trade Size: 147.0 shares
+  Avg Time Between Trades: 12.0s
+--------------------------------------------------
+
+--- Backtest Report ---
+Initial Capital: $1000.00
+Final Capital:   $1004.41
+Total PnL:       $4.41 (+0.44%)
+Max Drawdown:    0.00%
+Number of Markets Traded: 1
+Number of Markets Won: 1
+Number of Trading actions: 2
+Number of Winning Trades: 1
+Number of Losing Trades: 1
+Total Up Shares: 147
+Total Down Shares: 147
+
+--- Imbalanced Market Analysis ---
+All traded markets are balanced.
+------------------------------------
