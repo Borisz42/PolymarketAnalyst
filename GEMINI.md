@@ -17,11 +17,10 @@ The project is composed of several key modules, located in the `src` directory:
 *   `src/dashboard/dashboard.py`: A Streamlit application that provides a visualization of historical market data. It reads from the date-stamped CSV specified by the `ANALYSIS_DATE` in the config.
 *   `src/analysis/backtester.py`: A generic backtesting engine that can simulate various trading strategies on historical data.
 *   `src/analysis/strategies/`: A directory containing the different trading strategies that can be used with the backtester.
-*   `src/analysis/backtester.py`: A backtesting engine that simulates a `RebalancingStrategy` on historical data from the date-stamped CSV specified by the `ANALYSIS_DATE` in the config.
-*   `src/analysis/prediction_backtester.py`: A second backtester, which uses a `PredictionStrategy` on historical data from the date-stamped CSV specified by the `ANALYSIS_DATE` in the config.
+*   `src/analysis/prediction_backtester.py`: A backtester for the `PredictionStrategy`.
+*   `src/analysis/hybrid_backtester.py`: A backtester for the `HybridStrategy`.
 *   `src/analysis/analyze_prices.py`: A script for analyzing historical market data from a given day. It provides summary statistics, and determines market resolution outcomes. The script logs which specific markets resolved to "Up" and which to "Down".
 *   `src/data_collection/fetch_current_polymarket.py`: A utility script for fetching data from the Polymarket API.
-*   `risk_engine.py`, `state_manager.py`, and `accumulator.py`: These modules seem to contain the core logic for the trading strategy, risk management, and state tracking, which are utilized by the backtesting scripts.
 
 # Building and Running
 
@@ -59,6 +58,11 @@ python -m src.analysis.backtester
 python -m src.analysis.prediction_backtester
 ```
 
+**Hybrid Strategy:**
+```bash
+python -m src.analysis.hybrid_backtester
+```
+
 The backtester will output a detailed report of the strategy's performance, using the data file specified by `ANALYSIS_DATE` in `src/config.py`.
 ## 4. Run Price Analysis
 
@@ -75,5 +79,6 @@ python -m src.analysis.analyze_prices
     *   All strategies are located in the `src/analysis/strategies/` directory.
     *   Each strategy should be in its own file and inherit from the `Strategy` base class in `src/analysis/strategies/base_strategy.py`.
     *   To test a new strategy, create a new runner script in `src/analysis/` similar to `prediction_backtester.py`.
-*   **Dependencies:** The project does not have a `requirements.txt` file. Dependencies must be installed manually. So far, `pandas` and `streamlit` are known dependencies.
-*   **Imports:** Scripts within the `src/analysis/` package that are executed as modules must use relative imports (e.g., `from . import ...`) to access other modules within the same package.
+*   **Dependencies:** Project dependencies are managed in `requirements.txt`. To install them, run `pip install -r requirements.txt`. The dependencies are: `pandas`, `streamlit`, `pytest`, and `requests`.
+*   **Imports:** Scripts in `src/analysis` that are intended to be run as standalone modules should use absolute imports (e.g., `from src.analysis...`) rather than relative imports to avoid `ImportError`.
+*   **Agent Instructions:** For specific instructions on developing for this project as an AI agent, please refer to `AGENTS.md`.
