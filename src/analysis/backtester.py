@@ -230,14 +230,16 @@ class Backtester:
 
     def run_strategy(self, strategy_instance):
         current_timestamp = None
-        unique_timestamps = self.market_data['Timestamp'].unique()
-        n_unique_timestamps = len(unique_timestamps)
+        # --- OPTIMIZATION: Group by Timestamp ---
+        # Grouping data by timestamp once before the loop is much more efficient
+        # than iterating through unique timestamps and filtering the DataFrame on each iteration.
+        # This avoids redundant data scanning.
+        grouped_by_timestamp = self.market_data.groupby('Timestamp', sort=False)
+        n_unique_timestamps = len(grouped_by_timestamp)
         start_time = time.time()
 
         print("Running backtest...")
-        for i, ts_np in enumerate(unique_timestamps):
-            current_timestamp = pd.to_datetime(ts_np)
-
+        for i, (current_timestamp, current_data_points) in enumerate(grouped_by_timestamp):
             # Progress logging
             if n_unique_timestamps > 50 and (i + 1) % (n_unique_timestamps // 50) == 0:
                 elapsed_time = time.time() - start_time
@@ -249,20 +251,20 @@ class Backtester:
                       f"ETA: {datetime.timedelta(seconds=int(eta))}", end="")
 
             positions_to_remove_indices = []
-            
+
             # Process open positions for expiration at current_timestamp or earlier
             for pos_index, position in enumerate(self.open_positions):
                 if current_timestamp >= position['expiration']:
                     market_id_tuple = position['market_id']
-                    
+
                     resolved_info = self._resolve_single_position(market_id_tuple, position, current_timestamp)
-                    
+
                     if market_id_tuple not in self.pending_market_summaries:
                         self.pending_market_summaries[market_id_tuple] = []
                     self.pending_market_summaries[market_id_tuple].append(resolved_info)
-                    
+
                     positions_to_remove_indices.append(pos_index)
-            
+
             # Remove resolved positions from self.open_positions
             if positions_to_remove_indices:
                 for index in sorted(positions_to_remove_indices, reverse=True):
@@ -271,9 +273,7 @@ class Backtester:
                 # Record portfolio value after resolutions
                 self.portfolio_history.append((current_timestamp, self.capital))
 
-            # Get all data points for the current timestamp
-            current_data_points = self.market_data[self.market_data['Timestamp'] == current_timestamp]
-
+            # No need to filter `market_data` anymore, as `current_data_points` is the slice.
             for _, row in current_data_points.iterrows():
                 market_id_tuple = (row['TargetTime'], row['Expiration'])
                 
