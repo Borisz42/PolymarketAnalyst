@@ -8,7 +8,7 @@ This project is a tool for monitoring and analyzing Polymarket's 15-minute Bitco
 
 ## Core Components
 
--   **`src/data_collection/data_logger.py`**: A script that runs in the background to collect real-time market data and save it to CSV files in the `data/` directory.
+-   **`src/data_collection/data_logger.py`**: A multi-threaded script that runs in the background to collect real-time market data and save it to CSV files in the `data/` directory.
 -   **`src/analysis/backtester.py`**: The main backtesting engine. It simulates trading strategies on historical data, handles PnL calculations, and provides a detailed report. It is strategy-agnostic.
 -   **`src/analysis/prediction_backtester.py`**: A specialized backtester script that includes a `preprocess_data` function to create features needed for the `PredictionStrategy`. It uses the main `Backtester` class to run the simulation.
 -   **`src/analysis/hybrid_backtester.py`**: A backtester script for the `HybridStrategy`.
@@ -85,7 +85,7 @@ You may need to install pytest first: `pip install pytest`.
 -   **Creating a New Strategy**:
     1.  Create a new file in `src/analysis/strategies/`.
     2.  Your new strategy class should inherit from `Strategy` in `src/analysis/strategies/base_strategy.py`.
-    3.  Implement the `decide(self, market_data_point, current_capital)` method. This method should return `(side, quantity, entry_price)` to execute a trade, or `None` to do nothing.
+    3.  Implement the `decide(self, market_data_point, current_capital)` method. This method should return `(side, quantity, entry_price, score)` to execute a trade, or `None` to do nothing.
     4.  If your strategy requires state to be maintained, you can implement the `update_portfolio` method.
 -   **Testing**:
     -   When adding new features, please add corresponding tests in the `tests/` directory.

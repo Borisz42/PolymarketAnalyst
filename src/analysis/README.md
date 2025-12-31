@@ -49,10 +49,11 @@ The backtester is designed to be easily extensible. You can create your own trad
 
     Your `decide()` method should return one of two things:
     -   `None`: If no action should be taken.
-    -   A `tuple`: `(side, quantity, entry_price)` if you want to execute a trade.
+    -   A `tuple`: `(side, quantity, entry_price, score)` if you want to execute a trade.
         -   `side` (str): Either `'Up'` or `'Down'`.
         -   `quantity` (float): The number of shares to buy.
         -   `entry_price` (float): The price at which to buy the shares (e.g., `data_point['UpAsk']`).
+        -   `score` (float): A score representing the signal strength (optional, used for logging).
 
 4.  **Example Implementation**:
 
@@ -70,7 +71,7 @@ The backtester is designed to be easily extensible. You can create your own trad
                 quantity_to_buy = 10.0
                 cost = quantity_to_buy * data_point['UpAsk']
                 if capital >= cost:
-                    return ('Up', quantity_to_buy, data_point['UpAsk'])
+                    return ('Up', quantity_to_buy, data_point['UpAsk'], 1.0)
             return None
     ```
 

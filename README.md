@@ -5,8 +5,8 @@ A Python-based tool to monitor **Polymarket's 15-minute Bitcoin (BTC) Up/Down pr
 ## Features
 
 -   **Data Collection**:
+    -   **High-Frequency Logging**: Utilizes a multi-threaded architecture to fetch and log market data with high frequency.
     -   **Automated Market Detection**: Automatically finds the active 15-minute BTC market.
-    -   **Real-time Data Logging**: Fetches and logs market data, including comprehensive order book depth.
     -   **CSV Storage**: Stores historical data in date-stamped CSV files in the `data/` directory.
 
 -   **Interactive Dashboard**:
@@ -125,7 +125,6 @@ INITIAL_CAPITAL = 1000.0
 
 -   Watch the **Pair Cost chart** for trading opportunities.
 -   Use **Zoom Last 15m** to track recent market activity.
--   Monitor the **Opportunity Indicator** for real-time trading signals.
 
 ## Data Format
 

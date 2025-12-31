@@ -2,9 +2,17 @@
 
 This module is responsible for fetching and logging real-time data from Polymarket's 15-minute BTC prediction markets.
 
+## Architecture
+
+The data logger uses a multi-threaded architecture to ensure high performance and data integrity:
+
+-   **Thread Pool for Fetching**: A `ThreadPoolExecutor` manages a pool of worker threads that concurrently fetch market data. This allows for multiple data requests to be in flight at the same time, increasing the data collection frequency without blocking.
+-   **Thread-Safe Queue**: Fetched data is placed into a thread-safe `queue.Queue`. This acts as a buffer, decoupling the data fetching process from the disk writing process.
+-   **Dedicated Writer Thread**: A single, dedicated thread runs in the background, periodically waking up to flush all the data from the queue to the CSV file on disk. This approach minimizes disk I/O operations and prevents data loss or corruption that could occur with multiple writers.
+
 ## Scripts
 
--   **`data_logger.py`**: The main entry point for the data collection process. This script runs in a loop to continuously fetch the latest market data and append it to a date-stamped CSV file in the `data/` directory.
+-   **`data_logger.py`**: The main entry point for the data collection process. It initializes the thread pool and the writer thread, and then submits fetch tasks at a regular interval.
 
 -   **`fetch_current_polymarket.py`**: Handles the direct interaction with the Polymarket APIs. It fetches event details to get token IDs and then queries the order book for each outcome (Up/Down).
 
@@ -22,8 +30,8 @@ The data collection process relies on two primary Polymarket APIs:
 
 ## Data Flow
 
-1.  The `data_logger.py` script starts and calls `find_new_market.py` to identify the active market `slug`.
-2.  It then enters a loop, calling `fetch_current_polymarket.py` at regular intervals.
-3.  `fetch_current_polymarket.py` queries the **Gamma API** to get the market's token IDs.
-4.  It then queries the **CLOB API** for each token ID to get the order book data.
-5.  The structured data is returned to `data_logger.py`, which formats it and appends it as a new row to the appropriate CSV file in the `data/` directory.
+1.  The `data_logger.py` script starts and initializes the CSV file, thread pool, and writer thread.
+2.  The main loop submits a `fetch_worker` task to the thread pool at a regular interval defined in `config.py`.
+3.  The `fetch_worker` calls `fetch_current_polymarket.py` to query the Polymarket APIs.
+4.  The fetched and structured data row is put into the thread-safe `data_queue`.
+5.  The dedicated `writer_thread` wakes up periodically, drains the queue of all pending data, and writes the batch of rows to the CSV file in a single operation.
