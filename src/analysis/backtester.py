@@ -229,14 +229,22 @@ class Backtester:
         return entry_price
 
     def run_strategy(self, strategy_instance):
-        current_timestamp = None
-        unique_timestamps = self.market_data['Timestamp'].unique()
-        n_unique_timestamps = len(unique_timestamps)
+        # --- OPTIMIZATION: Group data by timestamp once before the loop ---
+        # Grouping the DataFrame by 'Timestamp' outside the main loop is significantly
+        # more performant than filtering the DataFrame for each unique timestamp inside the loop.
+        # This avoids thousands of redundant scans over the entire dataset.
+        # The result is a dictionary-like object where keys are timestamps
+        # and values are DataFrames containing all rows for that timestamp.
+        # `sort=False` is critical to prevent reordering events, which would invalidate the backtest.
+        grouped_by_timestamp = self.market_data.groupby('Timestamp', sort=False)
+        n_unique_timestamps = len(grouped_by_timestamp)
         start_time = time.time()
 
+        current_timestamp = None # Will be set in the loop
+
         print("Running backtest...")
-        for i, ts_np in enumerate(unique_timestamps):
-            current_timestamp = pd.to_datetime(ts_np)
+        for i, (ts, current_data_points) in enumerate(grouped_by_timestamp):
+            current_timestamp = ts  # Timestamp from the grouped data
 
             # Progress logging
             if n_unique_timestamps > 50 and (i + 1) % (n_unique_timestamps // 50) == 0:
@@ -271,12 +279,11 @@ class Backtester:
                 # Record portfolio value after resolutions
                 self.portfolio_history.append((current_timestamp, self.capital))
 
-            # Get all data points for the current timestamp
-            current_data_points = self.market_data[self.market_data['Timestamp'] == current_timestamp]
-
+            # Iterate directly over the rows of the pre-grouped DataFrame for the current timestamp.
+            # This is efficient as no further filtering is needed.
             for _, row in current_data_points.iterrows():
                 market_id_tuple = (row['TargetTime'], row['Expiration'])
-                
+
                 trade_decision = strategy_instance.decide(row, self.capital)
                 
                 if trade_decision:
