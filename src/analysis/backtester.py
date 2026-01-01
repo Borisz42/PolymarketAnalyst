@@ -258,7 +258,7 @@ class Backtester:
                 elapsed_time = time.time() - start_time
                 progress = (i + 1) / n_unique_timestamps
                 eta = (elapsed_time / progress) * (1 - progress) if progress > 0 else 0
-                self.console_logger.info(f"\r  -> Progress: {progress:.0%}, "
+                print(f"\r  -> Progress: {progress:.0%}, "
                       f"Elapsed: {datetime.timedelta(seconds=int(elapsed_time))}, "
                       f"ETA: {datetime.timedelta(seconds=int(eta))}", end="")
 
