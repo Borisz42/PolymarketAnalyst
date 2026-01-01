@@ -177,7 +177,7 @@ class Backtester:
         ])
 
         full_summary = "\n".join(summary_lines)
-        self._log_and_print(full_summary)
+        self.logger.info(full_summary)
 
     def _calculate_max_drawdown(self):
         if not self.portfolio_history:

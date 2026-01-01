@@ -18,3 +18,4 @@ __pycache__/
 market_urls_*.txt
 debug_polymarket.py
 data_logger_errors.log
+logs/
