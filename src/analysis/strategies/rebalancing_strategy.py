@@ -154,7 +154,7 @@ class RebalancingStrategy(Strategy):
 
                     if self.check_safety_margin(portfolio, side_to_buy, qty_to_try, price_to_buy):
                         # Found the optimal amount, return it
-                        return (side_to_buy, qty_to_try, price_to_buy)
+                        return (side_to_buy, qty_to_try, price_to_buy, 1.0)
 
                     qty_to_try -= 1
 
@@ -200,7 +200,7 @@ class RebalancingStrategy(Strategy):
                 continue
 
             if self.check_safety_margin(portfolio, target_side, qty_to_buy, target_price):
-                return (target_side, qty_to_buy, target_price)
+                return (target_side, qty_to_buy, target_price, 1.0)
 
             qty_to_buy -= 1
 

@@ -193,14 +193,27 @@ class Backtester:
         return max_drawdown
 
     def _apply_slippage(self, current_timestamp, market_id_tuple, side, entry_price):
+        """
+        Applies slippage to the entry price by looking ahead in the data.
+
+        --- OPTIMIZATION: Use pre-grouped market history ---
+        Instead of filtering the entire `market_data` DataFrame on every call,
+        this optimized version performs a lookup in the `market_history` dictionary,
+        which is pre-grouped by market. This dramatically reduces the search space
+        from the whole dataset to just the relevant market's data, leading to a
+        significant performance improvement, especially with large datasets.
+        """
         if self.slippage_seconds <= 0:
             return entry_price
         slippage_timestamp = current_timestamp + pd.Timedelta(seconds=self.slippage_seconds)
-        future_data = self.market_data[
-            (self.market_data['Timestamp'] >= slippage_timestamp) &
-            (self.market_data['TargetTime'] == market_id_tuple[0]) &
-            (self.market_data['Expiration'] == market_id_tuple[1])
-        ]
+
+        market_specific_data = self.market_history.get(market_id_tuple)
+        if market_specific_data is None:
+            return entry_price # Should not happen if data is consistent
+
+        # Find the first data point at or after the slippage_timestamp within the specific market
+        future_data = market_specific_data[market_specific_data['Timestamp'] >= slippage_timestamp]
+
         if not future_data.empty:
             slippage_row = future_data.iloc[0]
             price_col = 'UpAsk' if side == 'Up' else 'DownAsk'
@@ -230,38 +243,47 @@ class Backtester:
         self.logger.info("----------------------------\n")
 
         current_timestamp = None
-        unique_timestamps = self.market_data['Timestamp'].unique()
-        n_unique_timestamps = len(unique_timestamps)
+        # --- OPTIMIZATION: Group by Timestamp ---
+        # Grouping data by timestamp once before the loop is much more efficient
+        # than iterating through unique timestamps and filtering the DataFrame on each iteration.
+        # This avoids redundant data scanning.
+        grouped_by_timestamp = self.market_data.groupby('Timestamp', sort=False)
+        n_unique_timestamps = len(grouped_by_timestamp)
         start_time = time.time()
 
         self.console_logger.info("Running backtest...")
-        for i, ts_np in enumerate(unique_timestamps):
-            current_timestamp = pd.to_datetime(ts_np)
-
+        for i, (current_timestamp, current_data_points) in enumerate(grouped_by_timestamp):
+            # Progress logging
             if n_unique_timestamps > 50 and (i + 1) % (n_unique_timestamps // 50) == 0:
                 elapsed_time = time.time() - start_time
                 progress = (i + 1) / n_unique_timestamps
                 eta = (elapsed_time / progress) * (1 - progress) if progress > 0 else 0
-                print(f"\r  -> Progress: {progress:.0%}, "
+                self.console_logger.info(f"\r  -> Progress: {progress:.0%}, "
                       f"Elapsed: {datetime.timedelta(seconds=int(elapsed_time))}, "
                       f"ETA: {datetime.timedelta(seconds=int(eta))}", end="")
 
             positions_to_remove_indices = []
+
+            # Process open positions for expiration at current_timestamp or earlier
             for pos_index, position in enumerate(self.open_positions):
                 if current_timestamp >= position['expiration']:
                     market_id_tuple = position['market_id']
+
                     resolved_info = self._resolve_single_position(market_id_tuple, position, current_timestamp)
+
                     if market_id_tuple not in self.pending_market_summaries:
                         self.pending_market_summaries[market_id_tuple] = []
                     self.pending_market_summaries[market_id_tuple].append(resolved_info)
+
                     positions_to_remove_indices.append(pos_index)
-            
+
+            # Remove resolved positions from self.open_positions
             if positions_to_remove_indices:
                 for index in sorted(positions_to_remove_indices, reverse=True):
                     del self.open_positions[index]
                 self.portfolio_history.append((current_timestamp, self.capital))
 
-            current_data_points = self.market_data[self.market_data['Timestamp'] == current_timestamp]
+            # No need to filter `market_data` anymore, as `current_data_points` is the slice.
             for _, row in current_data_points.iterrows():
                 market_id_tuple = (row['TargetTime'], row['Expiration'])
                 trade_decision = strategy_instance.decide(row, self.capital)
@@ -296,7 +318,7 @@ class Backtester:
                         self.risk_events.append(event)
                         self.logger.warning(f"INSUFFICIENT CAPITAL: {event['details']}")
         
-        final_timestamp = pd.to_datetime(unique_timestamps[-1]) if len(unique_timestamps) > 0 else datetime.datetime.now(datetime.timezone.utc)
+        final_timestamp = current_timestamp if current_timestamp else datetime.datetime.now(datetime.timezone.utc)
         for position in self.open_positions[:]:
             market_id_tuple = position['market_id']
             resolved_info = self._resolve_single_position(market_id_tuple, position, final_timestamp)

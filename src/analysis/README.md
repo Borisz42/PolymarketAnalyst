@@ -49,10 +49,11 @@ The backtester is designed to be easily extensible. You can create your own trad
 
     Your `decide()` method should return one of two things:
     -   `None`: If no action should be taken.
-    -   A `tuple`: `(side, quantity, entry_price)` if you want to execute a trade.
+    -   A `tuple`: `(side, quantity, entry_price, score)` if you want to execute a trade.
         -   `side` (str): Either `'Up'` or `'Down'`.
         -   `quantity` (float): The number of shares to buy.
         -   `entry_price` (float): The price at which to buy the shares (e.g., `data_point['UpAsk']`).
+        -   `score` (float): A score representing the signal strength (optional, used for logging).
 
 4.  **Example Implementation**:
 
@@ -70,17 +71,18 @@ The backtester is designed to be easily extensible. You can create your own trad
                 quantity_to_buy = 10.0
                 cost = quantity_to_buy * data_point['UpAsk']
                 if capital >= cost:
-                    return ('Up', quantity_to_buy, data_point['UpAsk'])
+                    return ('Up', quantity_to_buy, data_point['UpAsk'], 1.0)
             return None
     ```
 
-5.  **Run the Backtester**: To run the backtester with your new strategy, you can modify the main execution block in `src/analysis/backtester.py` to import and instantiate your strategy.
+5.  **Run the Backtester**: To run your new strategy, create a new runner script in `src/analysis/` (e.g., `my_strategy_backtester.py`) by copying and modifying an existing one like `backtester.py`.
 
     ```python
-    # In src/analysis/backtester.py
+    # In src/analysis/my_strategy_backtester.py
     if __name__ == "__main__":
-        # from .strategies.rebalancing_strategy import RebalancingStrategy
         from .strategies.my_strategy import MyStrategy # Import your new strategy
+        from .backtester import Backtester
+        from ..config import INITIAL_CAPITAL, DATA_FILE
 
         backtester = Backtester(initial_capital=INITIAL_CAPITAL)
         try:
