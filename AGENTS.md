@@ -6,6 +6,12 @@ This document provides guidance for AI agents working on the Polymarket BTC Moni
 
 This project is a tool for monitoring and analyzing Polymarket's 15-minute Bitcoin (BTC) Up/Down prediction markets. It includes a data collection service, a backtesting engine, and an interactive dashboard. The primary goal is to develop and test profitable trading strategies.
 
+**Main Technologies:**
+*   **Python:** The core language for all scripts.
+*   **Streamlit:** Used for the interactive web dashboard.
+*   **Pandas:** Used for data manipulation and analysis.
+*   **Plotly:** Used for creating interactive charts in the dashboard.
+
 ## Core Components
 
 -   **`src/data_collection/data_logger.py`**: A multi-threaded script that runs in the background to collect real-time market data and save it to CSV files in the `data/` directory.
@@ -80,13 +86,16 @@ You may need to install pytest first: `pip install pytest`.
 -   **Objective**: To combine the `PredictionStrategy` and `RebalancingStrategy` to improve performance.
 -   **Logic**: It uses the `PredictionStrategy`'s signal to initiate a trade, and then uses the `RebalancingStrategy`'s logic to manage the position. This allows the strategy to enter trades based on market momentum, and then manage risk by seeking to create balanced pairs.
 
-## Development Guidelines
+## Development Conventions
 
--   **Creating a New Strategy**:
-    1.  Create a new file in `src/analysis/strategies/`.
-    2.  Your new strategy class should inherit from `Strategy` in `src/analysis/strategies/base_strategy.py`.
-    3.  Implement the `decide(self, market_data_point, current_capital)` method. This method should return `(side, quantity, entry_price, score)` to execute a trade, or `None` to do nothing.
-    4.  If your strategy requires state to be maintained, you can implement the `update_portfolio` method.
+-   **Data Storage:** All market data is stored in date-stamped CSV files, e.g., `data/market_data_YYYYMMDD.csv`. The data logger always writes to the current day's file.
+-   **Configuration:** Key parameters are configured in `src/config.py`. To analyze or backtest a specific day's data, set the `ANALYSIS_DATE` variable. If `ANALYSIS_DATE` is `0`, **the latest available data file** in the `data/` directory will be used for analysis. Otherwise, it should be an integer in `yyyymmdd` format (e.g., `20231225`).
+-   **Modular Strategies:** The project uses a modular design for trading strategies.
+    -   All strategies are located in the `src/analysis/strategies/` directory.
+    -   Each strategy should be in its own file and inherit from the `Strategy` base class in `src/analysis/strategies/base_strategy.py`.
+    -   To test a new strategy, create a new runner script in `src/analysis/` similar to `prediction_backtester.py`.
+-   **Dependencies:** Project dependencies are managed in `requirements.txt`. To install them, run `pip install -r requirements.txt`.
+-   **Imports:** Scripts in `src/analysis` that are intended to be run as standalone modules should use absolute imports (e.g., `from src.analysis...`) rather than relative imports to avoid `ImportError`.
 -   **Testing**:
     -   When adding new features, please add corresponding tests in the `tests/` directory.
     -   Always run the full test suite with `python -m pytest` before submitting changes.
