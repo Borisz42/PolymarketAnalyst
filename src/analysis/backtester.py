@@ -201,18 +201,27 @@ class Backtester:
         return max_drawdown
 
     def _apply_slippage(self, current_timestamp, market_id_tuple, side, entry_price):
-        """Applies slippage to the entry price."""
+        """
+        Applies slippage to the entry price by looking ahead in the data.
+
+        --- OPTIMIZATION: Use pre-grouped market history ---
+        Instead of filtering the entire `market_data` DataFrame on every call,
+        this optimized version performs a lookup in the `market_history` dictionary,
+        which is pre-grouped by market. This dramatically reduces the search space
+        from the whole dataset to just the relevant market's data, leading to a
+        significant performance improvement, especially with large datasets.
+        """
         if self.slippage_seconds <= 0:
             return entry_price
 
         slippage_timestamp = current_timestamp + pd.Timedelta(seconds=self.slippage_seconds)
 
-        # Find the first data point at or after the slippage_timestamp
-        future_data = self.market_data[
-            (self.market_data['Timestamp'] >= slippage_timestamp) &
-            (self.market_data['TargetTime'] == market_id_tuple[0]) &
-            (self.market_data['Expiration'] == market_id_tuple[1])
-        ]
+        market_specific_data = self.market_history.get(market_id_tuple)
+        if market_specific_data is None:
+            return entry_price # Should not happen if data is consistent
+
+        # Find the first data point at or after the slippage_timestamp within the specific market
+        future_data = market_specific_data[market_specific_data['Timestamp'] >= slippage_timestamp]
 
         if not future_data.empty:
             slippage_row = future_data.iloc[0]
