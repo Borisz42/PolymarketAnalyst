@@ -75,13 +75,14 @@ The backtester is designed to be easily extensible. You can create your own trad
             return None
     ```
 
-5.  **Run the Backtester**: To run the backtester with your new strategy, you can modify the main execution block in `src/analysis/backtester.py` to import and instantiate your strategy.
+5.  **Run the Backtester**: To run your new strategy, create a new runner script in `src/analysis/` (e.g., `my_strategy_backtester.py`) by copying and modifying an existing one like `backtester.py`.
 
     ```python
-    # In src/analysis/backtester.py
+    # In src/analysis/my_strategy_backtester.py
     if __name__ == "__main__":
-        # from .strategies.rebalancing_strategy import RebalancingStrategy
         from .strategies.my_strategy import MyStrategy # Import your new strategy
+        from .backtester import Backtester
+        from ..config import INITIAL_CAPITAL, DATA_FILE
 
         backtester = Backtester(initial_capital=INITIAL_CAPITAL)
         try:

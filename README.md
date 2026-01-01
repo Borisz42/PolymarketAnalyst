@@ -24,9 +24,8 @@ A Python-based tool to monitor **Polymarket's 15-minute Bitcoin (BTC) Up/Down pr
 The project is organized into the following structure. For more detailed information on each module, please refer to the `README.md` file within the respective directory.
 
 ```
-PolymarketAnalyst/
+.
 ├── AGENTS.md
-├── GEMINI.md
 ├── README.md
 ├── data/
 │   └── market_data_20251226.csv
