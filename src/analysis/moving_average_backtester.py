@@ -1,7 +1,7 @@
 import src.config as config
 from .backtester import Backtester
 from .strategies.moving_average_strategy import MovingAverageStrategy
-from .preprocessing import preprocess_data
+from .preprocessing import preprocess_base_features, preprocess_moving_average_features
 
 if __name__ == "__main__":
     # Instantiate the strategy with fine-tuned parameters
@@ -22,7 +22,8 @@ if __name__ == "__main__":
         exit()
 
     # Pre-process the data
-    backtester.market_data = preprocess_data(backtester.market_data)
+    backtester.market_data = preprocess_base_features(backtester.market_data)
+    backtester.market_data = preprocess_moving_average_features(backtester.market_data)
 
     # Run the backtest
     backtester.run_strategy(strategy)
