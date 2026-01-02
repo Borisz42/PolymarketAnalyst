@@ -6,42 +6,44 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 # --- Configuration ---
 DATA_API = "https://data-api.polymarket.com"
-API_LIMIT_PER_PAGE = 1000
+API_LIMIT_PER_PAGE = 500
 
-def fetch_user_trades_for_date_range(wallet_address, start_time_utc):
+def fetch_user_trades_for_date_range(wallet_address, start_timestamp, end_timestamp):
     """
-    Fetches historical trades for a user since a specific start time, handling API pagination efficiently.
-    The API returns trades newest-first, so we stop paginating once we see a trade older than the start_time.
+    Fetches historical trades for a user for a specific date range, handling API pagination efficiently.
     """
     all_trades = []
     offset = 0
-    print(f"Starting to fetch trades since {start_time_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}...")
+    start_dt = datetime.fromtimestamp(start_timestamp, tz=ZoneInfo("UTC"))
+    print(f"Starting to fetch trades since {start_dt.strftime('%Y-%m-%d %H:%M:%S UTC')}...")
 
     while True:
-        url = f"{DATA_API}/trades"
-        params = {"user": wallet_address, "limit": API_LIMIT_PER_PAGE, "offset": offset}
+        url = f"{DATA_API}/activity"
+        params = {
+            "user": wallet_address,
+            "limit": API_LIMIT_PER_PAGE,
+            "offset": offset,
+            "start": int(start_timestamp),
+            "end": int(end_timestamp),
+            "type": "TRADE"
+        }
         try:
             response = requests.get(url, params=params)
             response.raise_for_status()
             trades_page = response.json()
 
             if not trades_page:
-                print("No more trades found on the API.")
+                print("No more trades found on the API for the given date range.")
                 break
 
             all_trades.extend(trades_page)
             print(f"Fetched {len(trades_page)} trades. Total so far: {len(all_trades)}")
 
-            # The API returns trades newest to oldest. Stop when we reach a trade
-            # that is older than our desired start time.
-            last_trade_timestamp = trades_page[-1].get("timestamp", 0)
-            last_trade_time_utc = datetime.fromtimestamp(last_trade_timestamp, tz=ZoneInfo("UTC"))
-
-            if last_trade_time_utc < start_time_utc:
-                print("Reached trades older than the start of the target date. Stopping API calls.")
+            # The API returns a limited number of trades per page, so we paginate until we get an empty response.
+            offset += len(trades_page)
+            if len(trades_page) < API_LIMIT_PER_PAGE:
                 break
 
-            offset += len(trades_page)
 
         except requests.exceptions.RequestException as e:
             print(f"An error occurred while fetching trades: {e}")
@@ -50,9 +52,9 @@ def fetch_user_trades_for_date_range(wallet_address, start_time_utc):
     print(f"Finished fetching. Total trades retrieved: {len(all_trades)}")
     return all_trades
 
-def process_and_filter_trades(trades, start_time_utc, end_time_utc):
+def process_and_filter_trades(trades):
     """
-    Processes raw trade data, filters for 15-min BTC markets within the date range, and converts timestamps to ET.
+    Processes raw trade data, filters for 15-min BTC markets, and converts timestamps to ET.
     """
     processed_trades = []
     try:
@@ -61,19 +63,14 @@ def process_and_filter_trades(trades, start_time_utc, end_time_utc):
         print("Error: 'America/New_York' timezone not found. Please ensure your system's timezone database is up to date.")
         return []
 
-    print(f"Filtering {len(trades)} trades for 15-min BTC markets between {start_time_utc.astimezone(et_zone).strftime('%Y-%m-%d %H:%M:%S %Z')} and {end_time_utc.astimezone(et_zone).strftime('%Y-%m-%d %H:%M:%S %Z')}...")
+    print(f"Filtering {len(trades)} trades for 15-min BTC markets...")
 
     for trade in trades:
-        trade_timestamp = trade.get("timestamp", 0)
-        trade_time_utc = datetime.fromtimestamp(trade_timestamp, tz=ZoneInfo("UTC"))
-
-        # Primary filter: Ensure the trade is within the desired time window [start, end).
-        if not (start_time_utc <= trade_time_utc < end_time_utc):
-            continue
-
         title = trade.get("title", "")
         # Heuristic filter for 15-minute markets: title contains "Bitcoin Up or Down" and a hyphen in the time description part.
         if "Bitcoin Up or Down" in title and "-" in title.split(" - ")[-1]:
+            trade_timestamp = trade.get("timestamp", 0)
+            trade_time_utc = datetime.fromtimestamp(trade_timestamp, tz=ZoneInfo("UTC"))
             trade_time_et = trade_time_utc.astimezone(et_zone)
             processed_trades.append({
                 "timestamp_et": trade_time_et.strftime('%Y-%m-%d %H:%M:%S'),
@@ -142,11 +139,12 @@ def main():
         save_trades_to_csv([], args.output_file)
         return
 
-    all_trades = fetch_user_trades_for_date_range(args.address, start_of_day_utc)
+    start_timestamp = start_of_day_utc.timestamp()
+    end_timestamp = end_of_day_utc.timestamp()
+    all_trades = fetch_user_trades_for_date_range(args.address, start_timestamp, end_timestamp)
 
     if all_trades:
-        # The fetching logic might overshoot, so we need a precise filter here.
-        filtered_trades = process_and_filter_trades(all_trades, start_of_day_utc, end_of_day_utc)
+        filtered_trades = process_and_filter_trades(all_trades)
         save_trades_to_csv(filtered_trades, args.output_file)
     else:
         print("No trades were fetched. A file will be created with only headers.")
