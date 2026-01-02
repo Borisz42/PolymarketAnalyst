@@ -57,21 +57,38 @@ The backtester is designed to be easily extensible. You can create your own trad
 
 4.  **Example Implementation**:
 
+    Here is a more practical example of a simple moving average (SMA) crossover strategy. This strategy calculates two moving averages of the mid-price and buys "Up" when the short-term average crosses above the long-term average, signaling upward momentum.
+
     ```python
-    # In src/analysis/strategies/my_strategy.py
+    # In src/analysis/strategies/moving_average_strategy.py
+    import pandas as pd
     from .base_strategy import Strategy
 
-    class MyStrategy(Strategy):
-        def __init__(self):
+    class MovingAverageStrategy(Strategy):
+        def __init__(self, short_window=5, long_window=20):
             super().__init__()
+            self.short_window = short_window
+            self.long_window = long_window
+            self.prices = []
+            self.short_sma = []
+            self.long_sma = []
 
         def decide(self, data_point, capital):
-            # A simple strategy: buy 10 UP shares if the ask price is below $0.50
-            if data_point['UpAsk'] < 0.50:
-                quantity_to_buy = 10.0
-                cost = quantity_to_buy * data_point['UpAsk']
-                if capital >= cost:
-                    return ('Up', quantity_to_buy, data_point['UpAsk'], 1.0)
+            self.prices.append(data_point['UpMid'])
+
+            if len(self.prices) > self.long_window:
+                # Calculate SMAs
+                short_sma_val = pd.Series(self.prices[-self.short_window:]).mean()
+                long_sma_val = pd.Series(self.prices[-self.long_window:]).mean()
+                self.short_sma.append(short_sma_val)
+                self.long_sma.append(long_sma_val)
+
+                # Check for crossover signal
+                if len(self.short_sma) > 1 and self.short_sma[-2] < self.long_sma[-2] and short_sma_val > long_sma_val:
+                    quantity = 10.0
+                    cost = quantity * data_point['UpAsk']
+                    if capital >= cost:
+                        return ('Up', quantity, data_point['UpAsk'], 1.0)
             return None
     ```
 
@@ -95,3 +112,17 @@ The backtester is designed to be easily extensible. You can create your own trad
         backtester.run_strategy(strategy)
         backtester.generate_report()
     ```
+
+### Note on Stateful Strategies
+
+Some strategies, like the `MovingAverageStrategy` example above, need to maintain a state (e.g., a history of prices) across multiple calls to the `decide()` method. The backtester supports this naturally. Any instance variables you define in your strategy's `__init__` method will persist throughout the backtest.
+
+For more advanced state management that might involve updating the portfolio based on trade confirmations, the backtester checks if a strategy has an `update_portfolio` method. If it does, it will call it after a trade is successfully executed.
+
+```python
+# In your strategy class
+def update_portfolio(self, trade_confirmation):
+    # trade_confirmation is a dict containing details of the trade
+    print(f"Trade confirmed: {trade_confirmation}")
+    # Update your strategy's internal state based on the trade
+```
