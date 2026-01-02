@@ -5,13 +5,21 @@ from src.analysis.strategies.prediction_strategy import PredictionStrategy
 from src.analysis.strategies.moving_average_strategy import MovingAverageStrategy
 
 def get_winning_side(market_data):
-    """Determines the winning side of a market."""
+    """Determines the winning side of a market based on final ask prices."""
     final_row = market_data.iloc[-1]
-    if final_row['UpMid'] == 0:
-        return 'Up'
-    elif final_row['DownMid'] == 0:
+    up_ask = final_row.get('UpAsk', 0)
+    down_ask = final_row.get('DownAsk', 0)
+
+    # If the 'Up' shares are worthless, 'Down' wins.
+    if up_ask == 0 and down_ask > 0:
         return 'Down'
-    return 'Up' if final_row['UpMid'] > final_row['DownMid'] else 'Down'
+    # If the 'Down' shares are worthless, 'Up' wins.
+    elif down_ask == 0 and up_ask > 0:
+        return 'Up'
+    elif down_ask > up_ask:
+        return 'Down'
+    else:
+        return 'Up'
 
 
 
