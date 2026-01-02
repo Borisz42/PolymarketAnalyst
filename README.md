@@ -151,30 +151,6 @@ The data logger captures comprehensive order book data in date-stamped CSV files
 
 To run the test suite, use the following command from the root directory:
 
-## Utilities
-
-### User Trade Logger
-
-The `src/analysis/user_trade_logger.py` script is a command-line tool designed to fetch the historical trading data for any user on Polymarket and save it to a CSV file. This is useful for analyzing the trading strategies of specific users.
-
-**Usage:**
-
-```bash
-python -m src.analysis.user_trade_logger --address <USER_WALLET_ADDRESS> --date <YYYY-MM-DD> --output-file <FILENAME.csv>
-```
-
--   `--address`: The user's wallet address (e.g., `0x...`).
--   `--date`: The earliest date to fetch trades from.
--   `--output-file` (optional): The name of the CSV file to save the data to. Defaults to `user_trades.csv`.
-
-**Example:**
-
-To fetch all trades for the user `0x6031b6eed1c97e853c6e0f03ad3ce3529351f96d` since December 29, 2025, and save them to `gabagool_trades.csv`:
-
-```bash
-python -m src.analysis.user_trade_logger --address 0x6031b6eed1c97e853c6e0f03ad3ce3529351f96d --date 2025-12-29 --output-file gabagool_trades.csv
-```
-
 ```bash
 python -m pytest
 ```
