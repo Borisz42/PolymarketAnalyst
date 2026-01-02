@@ -24,6 +24,7 @@ class Backtester:
         self.market_data = pd.DataFrame()
         self.market_history = {} # Stores historical data grouped by market for resolution
         self.pending_market_summaries = {} # Key: market_id_tuple, Value: list of resolved_position_info dictionaries
+        self.transactions_by_market = {} # OPTIMIZATION: Store transactions grouped by market
         
         # Risk tracking (from risk_engine.py)
         self.max_drawdown = 0.0
@@ -120,6 +121,7 @@ class Backtester:
             'Value': position['quantity'] * position['entry_price'], 'PnL': pnl, 'WinningSide': winning_side
         }
         self.transactions.append(resolution_log_entry)
+        self.transactions_by_market.setdefault(market_id_tuple, []).append(resolution_log_entry)
         self.logger.info(f"RESOLUTION: {resolution_log_entry}")
         
         return {
@@ -144,14 +146,20 @@ class Backtester:
         avg_up_price = total_up_cost / total_up_shares if total_up_shares > 0 else 0.0
         avg_down_price = total_down_cost / total_down_shares if total_down_shares > 0 else 0.0
 
-        market_txs = [t for t in self.transactions if t['MarketID'] == market_id_tuple and t['Type'] == 'Buy']
-        total_trades = len(market_txs)
-        avg_trade_size = sum(t['Quantity'] for t in market_txs) / total_trades if total_trades > 0 else 0
+        # --- OPTIMIZATION: Use pre-grouped transactions ---
+        # Instead of searching the global transactions list, this pulls from a pre-grouped
+        # dictionary, which is significantly faster.
+        market_buy_txs = [
+            t for t in self.transactions_by_market.get(market_id_tuple, [])
+            if t['Type'] == 'Buy'
+        ]
+        total_trades = len(market_buy_txs)
+        avg_trade_size = sum(t['Quantity'] for t in market_buy_txs) / total_trades if total_trades > 0 else 0
         
         avg_time_between_trades_str = "N/A"
         if total_trades > 1:
-            market_txs.sort(key=lambda x: x['Timestamp'])
-            timestamps = [t['Timestamp'] for t in market_txs]
+            market_buy_txs.sort(key=lambda x: x['Timestamp'])
+            timestamps = [t['Timestamp'] for t in market_buy_txs]
             time_diffs = [(timestamps[i] - timestamps[i-1]).total_seconds() for i in range(1, len(timestamps))]
             avg_seconds = sum(time_diffs) / len(time_diffs)
             avg_time_between_trades_str = f"{avg_seconds:.1f}s" if avg_seconds < 60 else f"{int(avg_seconds // 60)}m {int(avg_seconds % 60)}s"
@@ -309,6 +317,7 @@ class Backtester:
                             'Value': cost, 'PnL': -cost
                         }
                         self.transactions.append(trade_log_entry)
+                        self.transactions_by_market.setdefault(market_id_tuple, []).append(trade_log_entry)
                         self.logger.info(f"TRADE: {trade_log_entry}")
                     else:
                         event = {
