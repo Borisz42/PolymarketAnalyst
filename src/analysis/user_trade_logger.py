@@ -1,6 +1,7 @@
 import requests
 import csv
 import argparse
+import os
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -8,150 +9,160 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 DATA_API = "https://data-api.polymarket.com"
 API_LIMIT_PER_PAGE = 1000
 
-def fetch_user_trades_for_date_range(wallet_address, start_time_utc):
+def fetch_and_process_trades(wallet_address, start_time_utc, end_time_utc, temp_filename):
     """
-    Fetches historical trades for a user since a specific start time, handling API pagination efficiently.
-    The API returns trades newest-first, so we stop paginating once we see a trade older than the start_time.
+    Fetches user trades, filters them, and saves them to a temporary CSV file without sorting.
+    This preserves memory by processing data in chunks and provides progress updates.
     """
-    all_trades = []
-    offset = 0
-    print(f"Starting to fetch trades since {start_time_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}...")
-
-    while True:
-        url = f"{DATA_API}/trades"
-        params = {"user": wallet_address, "limit": API_LIMIT_PER_PAGE, "offset": offset}
-        try:
-            response = requests.get(url, params=params)
-            response.raise_for_status()
-            trades_page = response.json()
-
-            if not trades_page:
-                print("No more trades found on the API.")
-                break
-
-            all_trades.extend(trades_page)
-            print(f"Fetched {len(trades_page)} trades. Total so far: {len(all_trades)}")
-
-            # The API returns trades newest to oldest. Stop when we reach a trade
-            # that is older than our desired start time.
-            last_trade_timestamp = trades_page[-1].get("timestamp", 0)
-            last_trade_time_utc = datetime.fromtimestamp(last_trade_timestamp, tz=ZoneInfo("UTC"))
-
-            if last_trade_time_utc < start_time_utc:
-                print("Reached trades older than the start of the target date. Stopping API calls.")
-                break
-
-            offset += len(trades_page)
-
-        except requests.exceptions.RequestException as e:
-            print(f"An error occurred while fetching trades: {e}")
-            break
-
-    print(f"Finished fetching. Total trades retrieved: {len(all_trades)}")
-    return all_trades
-
-def process_and_filter_trades(trades, start_time_utc, end_time_utc):
-    """
-    Processes raw trade data, filters for 15-min BTC markets within the date range, and converts timestamps to ET.
-    """
-    processed_trades = []
     try:
         et_zone = ZoneInfo("America/New_York")
     except ZoneInfoNotFoundError:
         print("Error: 'America/New_York' timezone not found. Please ensure your system's timezone database is up to date.")
-        return []
+        return 0
 
-    print(f"Filtering {len(trades)} trades for 15-min BTC markets between {start_time_utc.astimezone(et_zone).strftime('%Y-%m-%d %H:%M:%S %Z')} and {end_time_utc.astimezone(et_zone).strftime('%Y-%m-%d %H:%M:%S %Z')}...")
-
-    for trade in trades:
-        trade_timestamp = trade.get("timestamp", 0)
-        trade_time_utc = datetime.fromtimestamp(trade_timestamp, tz=ZoneInfo("UTC"))
-
-        # Primary filter: Ensure the trade is within the desired time window [start, end).
-        if not (start_time_utc <= trade_time_utc < end_time_utc):
-            continue
-
-        title = trade.get("title", "")
-        # Heuristic filter for 15-minute markets: title contains "Bitcoin Up or Down" and a hyphen in the time description part.
-        if "Bitcoin Up or Down" in title and "-" in title.split(" - ")[-1]:
-            trade_time_et = trade_time_utc.astimezone(et_zone)
-            processed_trades.append({
-                "timestamp_et": trade_time_et.strftime('%Y-%m-%d %H:%M:%S'),
-                "market_title": title,
-                "outcome": trade.get("outcome", "N/A"),
-                "side": trade.get("side", "N/A"),
-                "size": trade.get("size", 0),
-                "price": trade.get("price", 0.0),
-            })
-
-    # Sort the final list chronologically before returning
-    processed_trades.sort(key=lambda x: x["timestamp_et"])
-
-    print(f"Found {len(processed_trades)} trades matching the criteria.")
-    return processed_trades
-
-def save_trades_to_csv(processed_trades, filename):
-    """
-    Saves the list of processed trades to a CSV file. If the list is empty,
-    it creates a file with only the headers.
-    """
     headers = ["timestamp_et", "market_title", "outcome", "side", "size", "price"]
+    total_trades_saved = 0
+    total_trades_scanned = 0
+    offset = 0
+
+    print(f"Starting to fetch and process trades from {start_time_utc.strftime('%Y-%m-%d %H:%M:%S UTC')} to {end_time_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}...")
 
     try:
-        with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
+        with open(temp_filename, 'w', newline='', encoding='utf-8') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=headers)
             writer.writeheader()
-            writer.writerows(processed_trades)
 
-        if processed_trades:
-            print(f"Successfully saved {len(processed_trades)} trades to {filename}")
-        else:
-            print(f"No trades to save. Successfully created an empty file with headers: {filename}")
+            while True:
+                url = f"{DATA_API}/trades"
+                params = {"user": wallet_address, "limit": API_LIMIT_PER_PAGE, "offset": offset}
+                try:
+                    response = requests.get(url, params=params)
+                    response.raise_for_status()
+                    trades_page = response.json()
+                except requests.exceptions.RequestException as e:
+                    print(f"An error occurred while fetching trades: {e}")
+                    break
+
+                if not trades_page:
+                    print("No more trades found on the API.")
+                    break
+
+                total_trades_scanned += len(trades_page)
+                page_filtered_trades = []
+
+                for trade in trades_page:
+                    trade_timestamp = trade.get("timestamp", 0)
+                    trade_time_utc = datetime.fromtimestamp(trade_timestamp, tz=ZoneInfo("UTC"))
+
+                    if not (start_time_utc <= trade_time_utc < end_time_utc):
+                        continue
+
+                    title = trade.get("title", "")
+                    if "Bitcoin Up or Down" in title and "-" in title.split(" - ")[-1]:
+                        trade_time_et = trade_time_utc.astimezone(et_zone)
+                        page_filtered_trades.append({
+                            "timestamp_et": trade_time_et.strftime('%Y-%m-%d %H:%M:%S'),
+                            "market_title": title,
+                            "outcome": trade.get("outcome", "N/A"),
+                            "side": trade.get("side", "N/A"),
+                            "size": trade.get("size", 0),
+                            "price": trade.get("price", 0.0),
+                        })
+
+                if page_filtered_trades:
+                    writer.writerows(page_filtered_trades)
+                    total_trades_saved += len(page_filtered_trades)
+
+                print(f"Scanned: {total_trades_scanned} | Saved: {total_trades_saved} | Current Page Matches: {len(page_filtered_trades)}")
+
+                last_trade_timestamp = trades_page[-1].get("timestamp", 0)
+                last_trade_time_utc = datetime.fromtimestamp(last_trade_timestamp, tz=ZoneInfo("UTC"))
+                if last_trade_time_utc < start_time_utc:
+                    print("Reached trades older than the start of the target date. Stopping API calls.")
+                    break
+
+                offset += len(trades_page)
+
     except IOError as e:
-        print(f"Error writing to CSV file: {e}")
+        print(f"Error writing to temporary file: {e}")
+        return 0
+
+    print(f"\nFinished fetching. Total trades scanned: {total_trades_scanned}. Total matching trades found: {total_trades_saved}.")
+    return total_trades_saved
+
+def sort_and_save_final_csv(temp_filename, final_filename):
+    """
+    Reads the temporary CSV, sorts its contents chronologically, and saves to the final output file.
+    """
+    headers = ["timestamp_et", "market_title", "outcome", "side", "size", "price"]
+    try:
+        with open(temp_filename, 'r', newline='', encoding='utf-8') as csvfile:
+            reader = csv.DictReader(csvfile)
+            all_trades = list(reader)
+
+        if not all_trades:
+            print("No matching trades were found. Creating an empty output file.")
+            with open(final_filename, 'w', newline='', encoding='utf-8') as final_csv:
+                writer = csv.DictWriter(final_csv, fieldnames=headers)
+                writer.writeheader()
+            return
+
+        print(f"Sorting {len(all_trades)} trades...")
+        all_trades.sort(key=lambda x: x["timestamp_et"])
+
+        with open(final_filename, 'w', newline='', encoding='utf-8') as final_csv:
+            writer = csv.DictWriter(final_csv, fieldnames=headers)
+            writer.writeheader()
+            writer.writerows(all_trades)
+
+        print(f"Successfully sorted and saved {len(all_trades)} trades to {final_filename}")
+
+    except FileNotFoundError:
+        print(f"Warning: Temporary file '{temp_filename}' not found. Creating an empty output file.")
+        with open(final_filename, 'w', newline='', encoding='utf-8') as final_csv:
+            writer = csv.DictWriter(final_csv, fieldnames=headers)
+            writer.writeheader()
+    except IOError as e:
+        print(f"Error during file operations: {e}")
+
 
 def main():
-    """
-    Main function to parse arguments and orchestrate the trade fetching process.
-    """
     parser = argparse.ArgumentParser(description="Fetch historical trades for a Polymarket user for a specific date.")
     parser.add_argument("--address", required=True, help="User's wallet address (0x...).")
     parser.add_argument("--date", required=True, help="Date to fetch trades for (YYYY-MM-DD).")
-    parser.add_argument("--output-file", default="user_trades.csv", help="Name of the output CSV file.")
-
+    parser.add_argument("--output-file", default="user_trades.csv, help="Name of the output CSV file.")
     args = parser.parse_args()
 
     print(f"Starting trade logger for user: {args.address}")
 
     try:
-        # Interpret the input date as being in the UTC timezone.
         date_dt = datetime.strptime(args.date, "%Y-%m-%d")
         start_of_day_utc = date_dt.replace(tzinfo=ZoneInfo("UTC"))
         end_of_day_utc = start_of_day_utc + timedelta(days=1)
-    except ValueError:
-        print("Error: Invalid date format. Please use YYYY-MM-DD.")
-        return
-    except ZoneInfoNotFoundError:
-        print("Error: 'UTC' timezone not found. This is a critical system error.")
+    except (ValueError, ZoneInfoNotFoundError) as e:
+        print(f"Error parsing date or timezone: {e}")
         return
 
-    # If the user provides a future date, we can stop immediately.
     if start_of_day_utc > datetime.now(ZoneInfo("UTC")):
         print(f"Warning: The specified date {args.date} is in the future. No trades will be fetched.")
-        # Create an empty file to signify completion.
-        save_trades_to_csv([], args.output_file)
+        headers = ["timestamp_et", "market_title", "outcome", "side", "size", "price"]
+        with open(args.output_file, 'w', newline='', encoding='utf-8') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=headers)
+            writer.writeheader()
         return
 
-    all_trades = fetch_user_trades_for_date_range(args.address, start_of_day_utc)
+    temp_csv_file = f"temp_{os.path.basename(args.output_file)}"
 
-    if all_trades:
-        # The fetching logic might overshoot, so we need a precise filter here.
-        filtered_trades = process_and_filter_trades(all_trades, start_of_day_utc, end_of_day_utc)
-        save_trades_to_csv(filtered_trades, args.output_file)
-    else:
-        print("No trades were fetched. A file will be created with only headers.")
-        save_trades_to_csv([], args.output_file)
-
+    try:
+        fetch_and_process_trades(args.address, start_of_day_utc, end_of_day_utc, temp_csv_file)
+        sort_and_save_final_csv(temp_csv_file, args.output_file)
+    finally:
+        try:
+            if os.path.exists(temp_csv_file):
+                os.remove(temp_csv_file)
+                print(f"Removed temporary file: {temp_csv_file}")
+        except OSError as e:
+            print(f"Error removing temporary file: {e}")
 
 if __name__ == "__main__":
     main()
