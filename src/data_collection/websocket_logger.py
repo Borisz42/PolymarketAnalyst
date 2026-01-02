@@ -10,7 +10,7 @@ import csv
 
 # Configuration
 POLYMARKET_API_URL = "https://gamma-api.polymarket.com/events"
-WEBSOCKET_URI = "wss://clob.polymarket.com/ws"
+WEBSOCKET_URI = "wss://ws-subscriptions-clob.polymarket.com"
 DATA_DIR = "data"
 
 def generate_15m_slug(target_time):
