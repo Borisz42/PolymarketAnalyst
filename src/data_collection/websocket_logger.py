@@ -10,7 +10,7 @@ import csv
 
 # Configuration
 POLYMARKET_API_URL = "https://gamma-api.polymarket.com/events"
-WEBSOCKET_URI = "wss://ws-subscriptions-clob.polymarket.com"
+WEBSOCKET_URI = "wss://ws-subscriptions-clob.polymarket.com/ws"
 DATA_DIR = "data"
 
 def generate_15m_slug(target_time):
@@ -90,7 +90,6 @@ async def websocket_client(condition_id, token_ids, expiration_time):
     reconnection_attempts = 0
     while datetime.datetime.now(pytz.utc) < expiration_time:
         try:
-            print(f"Attempting to connect to WebSocket at: {WEBSOCKET_URI}")
             async with websockets.connect(WEBSOCKET_URI) as websocket:
                 reconnection_attempts = 0 # Reset on successful connection
                 print(f"WebSocket connected. Subscribing to market: {condition_id}")
@@ -146,10 +145,7 @@ async def websocket_client(condition_id, token_ids, expiration_time):
                 break
             await asyncio.sleep(5)
         except Exception as e:
-            print(f"An unexpected error occurred: {e}")
-            import traceback
-            traceback.print_exc()
-            print("Reconnecting in 5 seconds...")
+            print(f"An unexpected error occurred: {e}. Reconnecting in 5 seconds...")
             await asyncio.sleep(5)
 
 if __name__ == '__main__':
