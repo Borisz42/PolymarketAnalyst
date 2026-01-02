@@ -15,7 +15,7 @@ from src.config import DATA_DIR, BASE_DATA_FILENAME, TRACKED_USER_ADDRESS
 
 # --- Polymarket API URLs ---
 GAMMA_API_URL = "https://gamma-api.polymarket.com/markets"
-CORE_API_URL = "https://clob.polymarket.com/user"
+DATA_API_URL = "https://data-api.polymarket.com/activity"
 
 def get_market_details(slug: str) -> dict | None:
     """Fetches market details from the Gamma API to get the eventId."""
@@ -38,13 +38,17 @@ def get_market_details(slug: str) -> dict | None:
         return None
 
 def get_user_activity(event_id: str, user_address: str) -> list:
-    """Fetches user trade activity for a specific eventId."""
-    url = f"{CORE_API_URL}/{user_address}/activity"
-    params = {"eventId": event_id, "type": "TRADE"}
+    """Fetches user trade activity for a specific eventId from the Data API."""
+    params = {
+        "eventId": event_id,
+        "user": user_address,
+        "limit": 1000,  # A high limit to fetch all trades for the market
+        "type": "TRADE",
+    }
     try:
-        response = requests.get(url, params=params)
+        response = requests.get(DATA_API_URL, params=params, timeout=10)
         response.raise_for_status()
-        return response.json().get("activities", [])
+        return response.json()
     except requests.RequestException as e:
         print(f"Error fetching user activity for eventId '{event_id}': {e}")
         return []
@@ -77,17 +81,21 @@ def get_slugs_for_date(date_str: str) -> dict[str, str]:
 from datetime import timezone
 
 def process_trades(activities: list, market_details: dict, source_target_time: str) -> list[dict]:
-    """Processes raw trade activities into the desired format."""
+    """Processes raw trade activities from the Data API into the desired format."""
     processed = []
     for trade in activities:
-        # The API returns timestamps in microseconds, convert to seconds
-        timestamp_us = int(trade.get("timestamp", 0))
-        timestamp_dt = datetime.fromtimestamp(timestamp_us / 1_000_000, tz=timezone.utc)
+        # Data API timestamp is in ISO 8601 format with 'Z'
+        timestamp_str = trade.get("timestamp", "")
+        if timestamp_str:
+            timestamp_dt = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+            timestamp_formatted = timestamp_dt.strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            timestamp_formatted = None
 
         processed.append({
-            "timestamp": timestamp_dt.strftime('%Y-%m-%d %H:%M:%S'),
-            "trade_side": trade.get("side"),
-            "quantity": float(trade.get("quantity", 0)),
+            "timestamp": timestamp_formatted,
+            "trade_side": trade.get("outcome_name"), # e.g., 'Up' or 'Down'
+            "quantity": float(trade.get("size_in_usd", 0)),
             "price": float(trade.get("price", 0)),
             "TargetTime": source_target_time,
             "ExpirationTime": market_details.get("expirationTime"),
