@@ -130,7 +130,7 @@ def main():
     parser = argparse.ArgumentParser(description="Fetch historical trades for a Polymarket user for a specific date.")
     parser.add_argument("--address", required=True, help="User's wallet address (0x...).")
     parser.add_argument("--date", required=True, help="Date to fetch trades for (YYYY-MM-DD).")
-    parser.add_argument("--output-file", default="user_trades.csv, help="Name of the output CSV file.")
+    parser.add_argument("--output-file", default="user_trades.csv", help="Name of the output CSV file.")
     args = parser.parse_args()
 
     print(f"Starting trade logger for user: {args.address}")
