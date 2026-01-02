@@ -90,6 +90,7 @@ async def websocket_client(condition_id, token_ids, expiration_time):
     reconnection_attempts = 0
     while datetime.datetime.now(pytz.utc) < expiration_time:
         try:
+            print(f"Attempting to connect to WebSocket at: {WEBSOCKET_URI}")
             async with websockets.connect(WEBSOCKET_URI) as websocket:
                 reconnection_attempts = 0 # Reset on successful connection
                 print(f"WebSocket connected. Subscribing to market: {condition_id}")
@@ -138,14 +139,17 @@ async def websocket_client(condition_id, token_ids, expiration_time):
                                 last_log_second = current_time.second
 
         except websockets.exceptions.ConnectionClosed as e:
-            print(f"WebSocket closed: {e}. Reconnecting in 5s...")
+            print(f"WebSocket closed unexpectedly: {e}. Reconnecting in 5 seconds...")
             reconnection_attempts += 1
             if reconnection_attempts > 5:
                 print("Too many reconnection attempts. Exiting client for this market.")
                 break
             await asyncio.sleep(5)
         except Exception as e:
-            print(f"An error occurred: {e}. Reconnecting in 5s...")
+            print(f"An unexpected error occurred: {e}")
+            import traceback
+            traceback.print_exc()
+            print("Reconnecting in 5 seconds...")
             await asyncio.sleep(5)
 
 if __name__ == '__main__':
