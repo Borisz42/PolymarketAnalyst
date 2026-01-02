@@ -8,12 +8,23 @@ import time
 import os
 import csv
 
-from src.data_collection.find_new_market import generate_15m_slug
-
 # Configuration
 POLYMARKET_API_URL = "https://gamma-api.polymarket.com/events"
 WEBSOCKET_URI = "wss://clob.polymarket.com/ws"
 DATA_DIR = "data"
+
+def generate_15m_slug(target_time):
+    """
+    Generates the Polymarket event slug for a 15-minute market.
+    Format: btc-updown-15m-[TIMESTAMP]
+    The timestamp is the expiration time (Unix timestamp).
+    """
+    # Ensure time is in UTC for timestamp calculation
+    if target_time.tzinfo is None:
+        target_time = pytz.utc.localize(target_time)
+
+    timestamp = int(target_time.timestamp())
+    return f"btc-updown-15m-{timestamp}"
 
 def get_data_filename():
     """Generates the filename for the CSV data based on the current date."""
