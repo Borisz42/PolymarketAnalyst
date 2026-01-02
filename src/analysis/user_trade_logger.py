@@ -6,9 +6,28 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 # --- Configuration ---
 DATA_API = "https://data-api.polymarket.com"
+GAMMA_API = "https://gamma-api.polymarket.com"
 API_LIMIT_PER_PAGE = 500
 
-def fetch_user_trades_for_date_range(wallet_address, start_timestamp, end_timestamp):
+def fetch_btc_market_event_id():
+    """
+    Fetches the eventId for the 15-minute Bitcoin markets.
+    """
+    url = f"{GAMMA_API}/markets"
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        markets = response.json()
+        for market in markets:
+            if "Bitcoin Up or Down" in market.get("question", ""):
+                if market.get("active", False) and not market.get("closed", False):
+                    if market["events"] and len(market["events"]) > 0:
+                        return market["events"][0]["id"]
+    except requests.exceptions.RequestException as e:
+        print(f"An error occurred while fetching markets: {e}")
+    return None
+
+def fetch_user_trades_for_date_range(wallet_address, start_timestamp, end_timestamp, event_id=None):
     """
     Fetches historical trades for a user for a specific date range, handling API pagination efficiently.
     """
@@ -27,6 +46,9 @@ def fetch_user_trades_for_date_range(wallet_address, start_timestamp, end_timest
             "end": int(end_timestamp),
             "type": "TRADE"
         }
+        if event_id:
+            params["eventId"] = event_id
+
         try:
             response = requests.get(url, params=params)
             response.raise_for_status()
@@ -141,7 +163,12 @@ def main():
 
     start_timestamp = start_of_day_utc.timestamp()
     end_timestamp = end_of_day_utc.timestamp()
-    all_trades = fetch_user_trades_for_date_range(args.address, start_timestamp, end_timestamp)
+
+    event_id = fetch_btc_market_event_id()
+    if event_id:
+        print(f"Found eventId for 15-minute Bitcoin markets: {event_id}")
+
+    all_trades = fetch_user_trades_for_date_range(args.address, start_timestamp, end_timestamp, event_id)
 
     if all_trades:
         filtered_trades = process_and_filter_trades(all_trades)
