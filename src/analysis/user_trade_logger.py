@@ -1,19 +1,16 @@
 import requests
 import csv
 import argparse
-from datetime import datetime, timezone
+from datetime import datetime
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 # --- Configuration ---
 DATA_API = "https://data-api.polymarket.com"
-# The API docs state a max limit of 10000. We'll use 1000 to be safe.
 API_LIMIT_PER_PAGE = 1000
 
 def fetch_user_trades_since(wallet_address, start_time_utc):
     """
     Fetches historical trades for a user since a specific start time, handling API pagination efficiently.
-
-    This function assumes the API returns trades in reverse chronological order. It will stop
-    fetching more pages once it encounters a trade older than the specified start time.
     """
     all_trades = []
     offset = 0
@@ -21,11 +18,7 @@ def fetch_user_trades_since(wallet_address, start_time_utc):
 
     while True:
         url = f"{DATA_API}/trades"
-        params = {
-            "user": wallet_address,
-            "limit": API_LIMIT_PER_PAGE,
-            "offset": offset,
-        }
+        params = {"user": wallet_address, "limit": API_LIMIT_PER_PAGE, "offset": offset}
         try:
             response = requests.get(url, params=params)
             response.raise_for_status()
@@ -38,9 +31,8 @@ def fetch_user_trades_since(wallet_address, start_time_utc):
             all_trades.extend(trades_page)
             print(f"Fetched {len(trades_page)} trades. Total so far: {len(all_trades)}")
 
-            # Efficiency Optimization: Check the timestamp of the last trade on the page.
             last_trade_timestamp = trades_page[-1].get("timestamp", 0)
-            last_trade_time_utc = datetime.fromtimestamp(last_trade_timestamp, tz=timezone.utc)
+            last_trade_time_utc = datetime.fromtimestamp(last_trade_timestamp, tz=ZoneInfo("UTC"))
 
             if last_trade_time_utc < start_time_utc:
                 print("Reached trades older than the start date. Stopping API calls.")
@@ -57,28 +49,38 @@ def fetch_user_trades_since(wallet_address, start_time_utc):
 
 def process_and_filter_trades(trades, start_time_utc):
     """
-    Processes raw trade data and filters for trades that occurred after the specified start time.
+    Processes raw trade data, filters for 15-min BTC markets, and converts timestamps to ET.
     """
     processed_trades = []
-    print(f"Filtering {len(trades)} trades since {start_time_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}...")
+    try:
+        et_zone = ZoneInfo("America/New_York")
+    except ZoneInfoNotFoundError:
+        print("Error: 'America/New_York' timezone not found. Please ensure your system's timezone database is up to date.")
+        return []
+
+    print(f"Filtering {len(trades)} trades for 15-min BTC markets since {start_time_utc.astimezone(et_zone).strftime('%Y-%m-%d %H:%M:%S %Z')}...")
 
     for trade in trades:
-        trade_timestamp = trade.get("timestamp", 0)
-        trade_time_utc = datetime.fromtimestamp(trade_timestamp, tz=timezone.utc)
+        title = trade.get("title", "")
+        # Heuristic filter for 15-minute markets: title contains "Bitcoin Up or Down" and a hyphen in the time description part.
+        if "Bitcoin Up or Down" in title and "-" in title.split(" - ")[-1]:
+            trade_timestamp = trade.get("timestamp", 0)
+            trade_time_utc = datetime.fromtimestamp(trade_timestamp, tz=ZoneInfo("UTC"))
 
-        if trade_time_utc >= start_time_utc:
-            processed_trades.append({
-                "timestamp_utc": trade_time_utc.strftime('%Y-%m-%d %H:%M:%S'),
-                "market_title": trade.get("title", "NA"),
-                "outcome": trade.get("outcome", "N/A"),
-                "side": trade.get("side", "N/A"),
-                "size": trade.get("size", 0),
-                "price": trade.get("price", 0.0),
-            })
+            if trade_time_utc >= start_time_utc:
+                trade_time_et = trade_time_utc.astimezone(et_zone)
+                processed_trades.append({
+                    "timestamp_et": trade_time_et.strftime('%Y-%m-%d %H:%M:%S'),
+                    "market_title": title,
+                    "outcome": trade.get("outcome", "N/A"),
+                    "side": trade.get("side", "N/A"),
+                    "size": trade.get("size", 0),
+                    "price": trade.get("price", 0.0),
+                })
 
-    processed_trades.sort(key=lambda x: x["timestamp_utc"])
+    processed_trades.sort(key=lambda x: x["timestamp_et"])
 
-    print(f"Found {len(processed_trades)} trades in the specified time window.")
+    print(f"Found {len(processed_trades)} trades matching the criteria.")
     return processed_trades
 
 def save_trades_to_csv(processed_trades, filename):
@@ -89,7 +91,7 @@ def save_trades_to_csv(processed_trades, filename):
         print("No trades to save.")
         return
 
-    headers = ["timestamp_utc", "market_title", "outcome", "side", "size", "price"]
+    headers = ["timestamp_et", "market_title", "outcome", "side", "size", "price"]
 
     try:
         with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
@@ -114,9 +116,8 @@ def main():
     print(f"Starting trade logger for user: {args.address}")
 
     try:
-        # Convert the start date string to a datetime object, assuming UTC.
         start_date_dt = datetime.strptime(args.start_date, "%Y-%m-%d")
-        start_date_utc = start_date_dt.replace(tzinfo=timezone.utc)
+        start_date_utc = start_date_dt.replace(tzinfo=ZoneInfo("UTC"))
     except ValueError:
         print("Error: Invalid date format. Please use YYYY-MM-DD.")
         return
@@ -127,7 +128,7 @@ def main():
         filtered_trades = process_and_filter_trades(all_trades, start_date_utc)
         save_trades_to_csv(filtered_trades, args.output_file)
     else:
-        print("No trades were fetched, so there is nothing to process or save.")
+        print("No trades were fetched.")
 
 if __name__ == "__main__":
     main()
