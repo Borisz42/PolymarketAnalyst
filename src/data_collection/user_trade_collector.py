@@ -19,15 +19,19 @@ CORE_API_URL = "https://clob.polymarket.com/user"
 
 def get_market_details(slug: str) -> dict | None:
     """Fetches market details from the Gamma API to get the eventId."""
-    url = f"{GAMMA_API_URL}/{slug}"
     try:
-        response = requests.get(url)
+        response = requests.get(GAMMA_API_URL, params={"slug": slug}, timeout=10)
         response.raise_for_status()
         data = response.json()
+        if not data:
+            print(f"Warning: No market data returned for slug '{slug}'")
+            return None
+        # The API returns a list, we assume the first is the correct one
+        market_data = data[0]
+        event_data = market_data.get("event", {})
         return {
-            "eventId": data.get("event", {}).get("id"),
-            "expirationTime": data.get("endDate"),
-            "targetTime": data.get("startDate"), # Assuming startDate is the TargetTime
+            "eventId": event_data.get("id"),
+            "expirationTime": market_data.get("endDate"),
         }
     except requests.RequestException as e:
         print(f"Error fetching market details for slug '{slug}': {e}")

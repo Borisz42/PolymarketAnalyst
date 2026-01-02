@@ -66,12 +66,19 @@ class TestUserTradeCollector(unittest.TestCase):
     def test_get_market_details_success(self, mock_get):
         """Test successful fetching of market details."""
         mock_response = MagicMock()
-        mock_response.json.return_value = self.mock_market_details_response
+        # The API returns a list
+        mock_response.json.return_value = [self.mock_market_details_response]
         mock_get.return_value = mock_response
 
         details = get_market_details("test-slug")
         self.assertIsNotNone(details)
         self.assertEqual(details["eventId"], "test-event-id")
+        # Verify the call was made with params
+        mock_get.assert_called_with(
+            "https://gamma-api.polymarket.com/markets",
+            params={"slug": "test-slug"},
+            timeout=10
+        )
 
     @patch("requests.get", side_effect=requests.RequestException("API Error"))
     def test_get_market_details_api_error(self, mock_get):
