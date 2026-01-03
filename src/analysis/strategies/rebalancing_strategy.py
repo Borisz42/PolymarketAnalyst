@@ -4,14 +4,13 @@ from .base_strategy import Strategy
 class RebalancingStrategy(Strategy):
     def __init__(self):
         # Parameters from plan
-        self.SAFETY_MARGIN_M = 0.99
+        self.SAFETY_MARGIN_M = 0.95
         self.MAX_TRADE_SIZE = 500
-        self.MIN_BALANCE_QTY = 1
+        self.MIN_BALANCE_QTY = 55
 
         # Risk management parameters (from risk_engine.py)
-        self.MAX_UNHEDGED_DELTA = 50  # Maximum position imbalance
+        self.MAX_UNHEDGED_DELTA = 60  # Maximum position imbalance
         self.MIN_LIQUIDITY_MULTIPLIER = 3.0  # Opposite side must have 3x liquidity
-        self.STOP_LOSS_PERCENT = 2.0  # Stop loss at 2% loss
 
         # Portfolio state per market
         self.portfolio_state = {}  # key: market_id, value: {'qty_yes': int, 'qty_no': int, 'cost_yes': float, 'cost_no': float}
@@ -124,19 +123,21 @@ class RebalancingStrategy(Strategy):
                 return None
 
             # Use best ask prices from order book data
-            price_yes = market_data_point.get('UpAsk', 0)
-            price_no = market_data_point.get('DownAsk', 0)
+            price_up = market_data_point.get('UpAsk', 0)
+            price_down = market_data_point.get('DownAsk', 0)
 
             # Only increase position if buying a pair is profitable
-            if price_yes > 0 and price_no > 0 and (price_yes + price_no < self.SAFETY_MARGIN_M):
+            is_buying_up_safe = self.check_safety_margin(portfolio, 'Up', self.MIN_BALANCE_QTY, price_up)
+            is_buying_down_safe = self.check_safety_margin(portfolio, 'Down', self.MIN_BALANCE_QTY, price_down)
+            if price_up > 0 and price_down > 0 and (is_buying_up_safe or is_buying_down_safe):
                 # Determine the max quantity we can possibly add
                 qty_to_try = self.MAX_TRADE_SIZE - qty_yes
 
                 # Search for the largest, safe, and affordable quantity to buy
                 while qty_to_try > 0:
                     # Decide which side to buy first (the more expensive one, to lock in profit)
-                    side_to_buy = 'Up' if price_yes > price_no else 'Down'
-                    price_to_buy = price_yes if side_to_buy == 'Up' else price_no
+                    side_to_buy = 'Up' if is_buying_up_safe else 'Down'
+                    price_to_buy = price_up if side_to_buy == 'Up' else price_down
 
                     cost = qty_to_try * price_to_buy
                     if cost > current_capital:
@@ -166,18 +167,18 @@ class RebalancingStrategy(Strategy):
         if quantity_delta < self.MIN_BALANCE_QTY:
             return None
 
-        price_yes = market_data_point.get('UpAsk', 0)
-        price_no = market_data_point.get('DownAsk', 0)
+        price_up = market_data_point.get('UpAsk', 0)
+        price_down = market_data_point.get('DownAsk', 0)
 
         target_side = None
         target_price = 0.0
 
         if qty_yes > qty_no:
             target_side = 'Down'
-            target_price = price_no
+            target_price = price_down
         else: # qty_no > qty_yes
             target_side = 'Up'
-            target_price = price_yes
+            target_price = price_up
 
         if target_price <= 0:
             return None
