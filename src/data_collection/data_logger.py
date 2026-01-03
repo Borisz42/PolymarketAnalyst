@@ -32,7 +32,7 @@ def fetch_worker():
     thread, these concurrent workers become leaner, hold the GIL for less
     time, and improve overall I/O throughput.
     """
-    timestamp_utc = datetime.datetime.utcnow()
+    timestamp_utc = datetime.datetime.now(datetime.timezone.utc)
     start_time = time.time()
     
     try:
