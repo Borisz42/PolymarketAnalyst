@@ -367,24 +367,6 @@ class Backtester:
         num_markets_won = sum(1 for pnl in market_pnl.values() if pnl > 0)
         winning_trades_count = sum(1 for t in resolution_trades if t['PnL'] > 0)
         losing_trades_count = len(resolution_trades) - winning_trades_count
-
-        self.logger.info("\n--- Imbalanced Market Analysis ---")
-        market_shares = {}
-        for trade in buy_trades:
-            market_id = trade['MarketID']
-            if market_id not in market_shares:
-                market_shares[market_id] = {'Up': 0, 'Down': 0}
-            market_shares[market_id][trade['Side']] += trade['Quantity']
-
-        imbalanced_count = 0
-        for market_id, shares in market_shares.items():
-            if shares['Up'] != shares['Down']:
-                imbalanced_count += 1
-                market_id_formatted = f"({market_id[0].strftime('%Y-%m-%d %H:%M:%S')}, {market_id[1].strftime('%Y-%m-%d %H:%M:%S')})"
-                self.logger.info(f"Market {market_id_formatted} is imbalanced: Up={shares['Up']}, Down={shares['Down']}")
-        
-        if imbalanced_count == 0:
-            self.logger.info("All traded markets are balanced.")
         
         report_lines.extend([
             f"Number of Markets Traded: {num_markets_played}",
@@ -393,8 +375,7 @@ class Backtester:
             f"Number of Winning Trades: {winning_trades_count}",
             f"Number of Losing Trades: {losing_trades_count}",
             f"Total Up Shares: {total_up_shares}",
-            f"Total Down Shares: {total_down_shares}",
-            f"Number of Imbalanced markets: {imbalanced_count}"
+            f"Total Down Shares: {total_down_shares}"
         ])
         
         if self.risk_events:
@@ -407,6 +388,23 @@ class Backtester:
             for event_type, count in event_types.items():
                 report_lines.append(f"  {event_type}: {count}")
 
+        report_lines.append("\n--- Imbalanced Market Analysis ---")
+        market_shares = {}
+        for trade in buy_trades:
+            market_id = trade['MarketID']
+            if market_id not in market_shares:
+                market_shares[market_id] = {'Up': 0, 'Down': 0}
+            market_shares[market_id][trade['Side']] += trade['Quantity']
+
+        imbalanced_count = 0
+        for market_id, shares in market_shares.items():
+            if shares['Up'] != shares['Down']:
+                imbalanced_count += 1
+                market_id_formatted = f"({market_id[0].strftime('%Y-%m-%d %H:%M:%S')}, {market_id[1].strftime('%Y-%m-%d %H:%M:%S')})"
+                report_lines.append(f"Market {market_id_formatted} is imbalanced: Up={shares['Up']}, Down={shares['Down']}")
+
+        if imbalanced_count == 0:
+            report_lines.append("All traded markets are balanced.")
         report_lines.append("------------------------------------")
 
         full_report = "\n".join(report_lines)
