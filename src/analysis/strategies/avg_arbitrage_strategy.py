@@ -38,7 +38,7 @@ class AvgArbitrageStrategy(Strategy):
                     self.up_qty += qty_to_buy
                     self.up_total_cost += qty_to_buy * up_price
                     return ('Up', qty_to_buy, up_price, 1.0)
-            return (None, 0, 0, 0)
+            return None
 
         # Subsequent trades logic (balancing)
         qty_to_buy = 0
@@ -65,7 +65,7 @@ class AvgArbitrageStrategy(Strategy):
             # Check capital allocation limit
             projected_total_cost = self.up_total_cost + self.down_total_cost + (qty_to_buy * price)
             if projected_total_cost > self.max_capital_allocation_percentage * self.initial_capital_per_market:
-                return (None, 0, 0, 0) # Exceeds capital limit
+                return None # Exceeds capital limit
 
             # Update state and return trade
             if side == 'Up':
@@ -77,4 +77,4 @@ class AvgArbitrageStrategy(Strategy):
 
             return (side, qty_to_buy, price, 1.0)
 
-        return (None, 0, 0, 0)
+        return None
