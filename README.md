@@ -73,11 +73,7 @@ The project is organized into the following structure. For more detailed informa
 
 ## Installation
 
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/your-username/PolymarketAnalyst.git
-    cd PolymarketAnalyst
-    ```
+1.  **Clone the repository and navigate to the project directory.**
 2.  **Install the dependencies:**
     ```bash
     pip install -r requirements.txt
@@ -120,10 +116,14 @@ INITIAL_CAPITAL = 1000.0
     streamlit run src/dashboard/dashboard.py
     ```
 
-### Dashboard Tips
+### Using the Dashboard
 
--   Watch the **Pair Cost chart** for trading opportunities.
--   Use **Zoom Last 15m** to track recent market activity.
+The interactive dashboard is a powerful tool for visualizing market data. For a detailed explanation of each chart and its significance, please see the [Dashboard README](src/dashboard/README.md).
+
+**Key Tips:**
+-   **Identify Arbitrage**: Use the **Pair Cost** chart to spot opportunities where the combined cost of an "Up" and "Down" contract is less than $1.00.
+-   **Track Recent Activity**: Use the **Zoom Last 15m** button to focus on the current market's activity, which is crucial for making timely decisions.
+-   **Assess Liquidity**: Monitor the **Liquidity Depth** and **Liquidity Imbalance** charts to understand market sentiment and the feasibility of executing trades.
 
 ## Data Format
 
@@ -152,7 +152,7 @@ The data logger captures comprehensive order book data in date-stamped CSV files
 To run the test suite, use the following command from the root directory:
 
 ```bash
-pytest
+python -m pytest
 ```
 
 ## Contributing

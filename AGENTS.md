@@ -2,9 +2,13 @@
 
 This document provides guidance for AI agents working on the Polymarket BTC Monitor codebase.
 
+## Key Objective
+
+The primary goal of this project is to serve as a robust framework for **developing, backtesting, and deploying profitable, automated trading strategies** for Polymarket's prediction markets.
+
 ## Project Overview
 
-This project is a tool for monitoring and analyzing Polymarket's 15-minute Bitcoin (BTC) Up/Down prediction markets. It includes a data collection service, a backtesting engine, and an interactive dashboard. The primary goal is to develop and test profitable trading strategies.
+This project is a tool for monitoring and analyzing Polymarket's 15-minute Bitcoin (BTC) Up/Down prediction markets. It includes a data collection service, a backtesting engine, and an interactive dashboard.
 
 **Main Technologies:**
 *   **Python:** The core language for all scripts.
@@ -90,7 +94,8 @@ You may need to install pytest first: `pip install pytest`.
 
 -   **Data Storage:** All market data is stored in date-stamped CSV files, e.g., `data/market_data_YYYYMMDD.csv`. The data logger always writes to the current day's file.
 -   **Configuration:** Key parameters are configured in `src/config.py`. To analyze or backtest a specific day's data, set the `ANALYSIS_DATE` variable. If `ANALYSIS_DATE` is `0`, **the latest available data file** in the `data/` directory will be used for analysis. Otherwise, it should be an integer in `yyyymmdd` format (e.g., `20231225`).
--   **Modular Strategies:** The project uses a modular design for trading strategies.
+-   **Modular Backtester Design**: The project intentionally separates the backtesting engine (`backtester.py`) from the strategy logic (files in `src/analysis/strategies/`). This is a key architectural feature. When developing, avoid adding strategy-specific logic to `backtester.py`. Instead, create a new, dedicated runner script for your strategy that preprocesses data if necessary and then passes the strategy instance to the generic `Backtester`.
+-   **Modular Strategies:**
     -   All strategies are located in the `src/analysis/strategies/` directory.
     -   Each strategy should be in its own file and inherit from the `Strategy` base class in `src/analysis/strategies/base_strategy.py`.
     -   To test a new strategy, create a new runner script in `src/analysis/` similar to `prediction_backtester.py`.
