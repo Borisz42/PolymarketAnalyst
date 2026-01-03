@@ -114,7 +114,7 @@ INITIAL_CAPITAL = 1000.0
         ```bash
         python -m src.analysis.hybrid_backtester
         ```
-    -   **Moving Average Strategy:**
+   -   **Moving Average Strategy:**
         ```bash
         python -m src.analysis.moving_average_backtester
         ```
@@ -122,6 +122,33 @@ INITIAL_CAPITAL = 1000.0
     ```bash
     streamlit run src/dashboard/dashboard.py
     ```
+
+### Analysis Scripts
+
+#### Reverse Engineering Past Trades
+
+The `reverse_engineer.py` script is a powerful tool for analyzing historical trading data to understand and replicate past strategies. It takes a market data file and a user's trade history file as input, merging them to reconstruct the portfolio's state (e.g., average price and quantity for both sides) *before* each trade was executed.
+
+This allows for a detailed examination of the market conditions and portfolio state that may have triggered each trade.
+
+**Usage:**
+
+```bash
+python -m src.analysis.reverse_engineer --market-data [path_to_market_data.csv] --user-data [path_to_user_data.csv]
+```
+
+**Example:**
+
+To analyze the trades from December 26, 2025, run the following command:
+
+```bash
+python -m src.analysis.reverse_engineer --market-data data/market_data_20251226.csv --user-data data/user_data_20251226.csv
+```
+
+The script will generate two output files in the `logs/` directory:
+-   `reverse_engineering_summary.txt`: A high-level summary of the analysis run.
+-   `reverse_engineering_log.csv`: A detailed CSV file containing the market conditions and portfolio state for each trade, perfect for further analysis in tools like Jupyter notebooks.
+
 
 ### Trader's Insight
 
