@@ -28,7 +28,8 @@ class TestUserTradeCollector(unittest.TestCase):
             'TargetTime': ['2025-12-30 15:00:00', '2025-12-30 15:00:00'],
         })
         self.mock_market_details_response = {
-            "event": {"id": "test-event-id"},
+            "id": "test-event-id", # Top-level ID
+            "event": {"id": "nested-ignored-id"}, # Nested, ignored ID
             "endDate": "2025-12-30T15:00:00Z",
         }
         self.mock_user_activity_response = [
@@ -79,7 +80,6 @@ class TestUserTradeCollector(unittest.TestCase):
             "eventId": "test-event-id",
             "user": TRACKED_USER_ADDRESS,
             "limit": 1000,
-            "type": "TRADE",
         }
         mock_get.assert_called_with(
             "https://data-api.polymarket.com/activity",

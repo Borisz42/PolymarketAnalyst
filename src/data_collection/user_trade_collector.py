@@ -28,9 +28,8 @@ def get_market_details(slug: str) -> dict | None:
             return None
         # The API returns a list, we assume the first is the correct one
         market_data = data[0]
-        event_data = market_data.get("event", {})
         return {
-            "eventId": event_data.get("id"),
+            "eventId": market_data.get("id"), # Use the top-level ID
             "expirationTime": market_data.get("endDate"),
         }
     except requests.RequestException as e:
@@ -43,7 +42,6 @@ def get_user_activity(event_id: str, user_address: str) -> list:
         "eventId": event_id,
         "user": user_address,
         "limit": 1000,  # A high limit to fetch all trades for the market
-        "type": "TRADE",
     }
     try:
         response = requests.get(DATA_API_URL, params=params, timeout=10)
@@ -105,7 +103,7 @@ def process_trades(activities: list, market_details: dict, source_target_time: s
 def main():
     """Main function to collect user trades for a specific date."""
     parser = argparse.ArgumentParser(description="Collect user trades from Polymarket for a given date.")
-    parser.add_argument("--date", required=True, help="The date to collect data for, in YYYYMMDD format.")
+    parser.add-argument("--date", required=True, help="The date to collect data for, in YYYYMMDD format.")
     args = parser.parse_args()
 
     print(f"Starting user trade collection for date: {args.date}")
