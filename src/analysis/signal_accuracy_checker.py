@@ -10,16 +10,15 @@ def get_winning_side(market_data):
     up_ask = final_row.get('UpAsk', 0)
     down_ask = final_row.get('DownAsk', 0)
 
-    # If the 'Up' shares are worthless, 'Down' wins.
-    if up_ask == 0 and down_ask > 0:
-        return 'Down'
-    # If the 'Down' shares are worthless, 'Up' wins.
-    elif down_ask == 0 and up_ask > 0:
-        return 'Up'
+    if up_ask == 0:
+        winning_side = 'Up'
+    elif down_ask == 0:
+        winning_side = 'Down'
     elif down_ask > up_ask:
-        return 'Down'
+        winning_side = 'Down'
     else:
-        return 'Up'
+        winning_side = 'Up'
+    return winning_side
 
 
 
@@ -75,9 +74,8 @@ def analyze_signals():
     data = preprocess_base_features(data)
     data = preprocess_moving_average_features(data)
 
-    # Instantiate the strategies
+    # Instantiate the stateless strategy
     prediction_strategy = PredictionStrategy()
-    ma_strategy = MovingAverageStrategy()
 
     # Data structure to hold accuracy stats
     prediction_signal_stats = {}
@@ -91,8 +89,8 @@ def analyze_signals():
     for market_id, market_data in grouped:
         winning_side = get_winning_side(market_data)
 
-        # Reset strategy state for each market
-        ma_strategy.portfolio = {}
+        # Instantiate a new stateful strategy for each market to ensure no state leakage
+        ma_strategy = MovingAverageStrategy()
 
         for _, row in market_data.iterrows():
             # --- Prediction Strategy ---
