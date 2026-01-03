@@ -27,9 +27,12 @@ def init_csv():
 
 def fetch_worker():
     """
-    Background worker to fetch data and put it in the queue.
+    I/O-bound worker. Fetches data and puts the raw result onto the queue.
+    By offloading CPU-bound work (data processing, rounding) to the writer
+    thread, these concurrent workers become leaner, hold the GIL for less
+    time, and improve overall I/O throughput.
     """
-    timestamp = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+    timestamp_utc = datetime.datetime.utcnow()
     start_time = time.time()
     
     try:
@@ -37,84 +40,91 @@ def fetch_worker():
         elapsed_time = time.time() - start_time
         
         if err:
-            # Silence simple timeout errors or just print them briefly
-            print(f"[{timestamp}] Fetch Error ({elapsed_time:.3f}s): {err}")
+            # Log errors with a formatted timestamp
+            print(f"[{timestamp_utc.strftime('%Y-%m-%d %H:%M:%S')}] Fetch Error ({elapsed_time:.3f}s): {err}")
             return
 
-        # Check if data is complete
-        if not fetched_data or fetched_data.get('order_books') is None:
-            print(f"[{timestamp}] Incomplete data")
+        # Check for essential data before queueing
+        if not fetched_data or 'order_books' not in fetched_data:
+            print(f"[{timestamp_utc.strftime('%Y-%m-%d %H:%M:%S')}] Incomplete data received")
             return
 
-        # Extract values
-        data = fetched_data
-        target_time = data.get('target_time_utc', '')
-        expiration = data.get('expiration_time_utc', '')
-
-        target_time_str = target_time.strftime('%Y-%m-%d %H:%M:%S') if target_time else ''
-        expiration_str = expiration.strftime('%Y-%m-%d %H:%M:%S') if expiration else ''
+        # --- OPTIMIZATION: Put raw data on queue ---
+        # The worker's only job is I/O. It puts the raw timestamp and data
+        # on the queue. All CPU-bound processing is deferred to the writer.
+        data_queue.put((timestamp_utc, fetched_data))
         
-        # Extract order book data
-        up_book = data['order_books'].get('Up', {})
-        down_book = data['order_books'].get('Down', {})
+        # For logging, we can quickly access a key value
+        up_mid = fetched_data['order_books'].get('Up', {}).get('mid_price', 0.0)
+        down_mid = fetched_data['order_books'].get('Down', {}).get('mid_price', 0.0)
         
-        # UP side data (rounded to 3 decimal places)
-        up_bid = round(up_book.get('best_bid', 0.0), 3)
-        up_ask = round(up_book.get('best_ask', 0.0), 3)
-        up_mid = round(up_book.get('mid_price', 0.0), 3)
-        up_spread = round(up_book.get('spread', 0.0), 3)
-        up_bid_liq = round(up_book.get('bid_liquidity', 0.0), 3)
-        up_ask_liq = round(up_book.get('ask_liquidity', 0.0), 3)
-        
-        # DOWN side data (rounded to 3 decimal places)
-        down_bid = round(down_book.get('best_bid', 0.0), 3)
-        down_ask = round(down_book.get('best_ask', 0.0), 3)
-        down_mid = round(down_book.get('mid_price', 0.0), 3)
-        down_spread = round(down_book.get('spread', 0.0), 3)
-        down_bid_liq = round(down_book.get('bid_liquidity', 0.0), 3)
-        down_ask_liq = round(down_book.get('ask_liquidity', 0.0), 3)
-        
-        row = [
-            timestamp, target_time_str, expiration_str,
-            up_bid, up_ask, up_mid, up_spread, up_bid_liq, up_ask_liq,
-            down_bid, down_ask, down_mid, down_spread, down_bid_liq, down_ask_liq
-        ]
-        
-        # Enqueue the valid data row
-        data_queue.put(row)
-        
-        print(f"[{timestamp}] Fetched: Up({up_mid:.3f}) Down({down_mid:.3f}) fetch_time={elapsed_time:.3f}s")
+        print(f"[{timestamp_utc.strftime('%Y-%m-%d %H:%M:%S')}] Fetched: Up({up_mid:.3f}) Down({down_mid:.3f}) fetch_time={elapsed_time:.3f}s")
 
     except Exception as e:
-        print(f"[{timestamp}] Worker Exception: {e}")
+        print(f"[{timestamp_utc.strftime('%Y-%m-%d %H:%M:%S')}] Worker Exception: {e}")
 
 def writer_thread():
     """
-    Dedicated thread that wakes up periodically to flush queue to disk.
+    CPU-bound worker. Drains the queue, processes the raw data in a batch,
+    and writes the final, formatted rows to disk. This centralizes the CPU work
+    for better efficiency and cache locality.
     """
     print("Writer thread started.")
     while True:
         time.sleep(config.WRITE_INTERVAL_SECONDS)
         
-        rows_to_write = []
+        raw_data_batch = []
         try:
-            # Drain the queue
+            # Drain the queue of all raw data
             while True:
-                row = data_queue.get_nowait()
-                rows_to_write.append(row)
+                raw_data_batch.append(data_queue.get_nowait())
                 data_queue.task_done()
         except queue.Empty:
             pass
         
-        if rows_to_write:
-            # Sort rows by timestamp (index 0) to ensure strictly ascending order
-            rows_to_write.sort(key=lambda x: x[0])
+        if raw_data_batch:
+            # --- OPTIMIZATION: Centralized CPU Work ---
+            # All data processing happens here in a single, efficient batch.
+
+            # 1. Sort by the timestamp object (the first element of the tuple)
+            raw_data_batch.sort(key=lambda x: x[0])
+
+            final_rows_to_write = []
+            for timestamp_utc, data in raw_data_batch:
+                # 2. Perform all string formatting and rounding in this loop
+                timestamp_str = timestamp_utc.strftime('%Y-%m-%d %H:%M:%S')
+                target_time = data.get('target_time_utc', '')
+                expiration = data.get('expiration_time_utc', '')
+                target_time_str = target_time.strftime('%Y-%m-%d %H:%M:%S') if target_time else ''
+                expiration_str = expiration.strftime('%Y-%m-%d %H:%M:%S') if expiration else ''
+
+                up_book = data.get('order_books', {}).get('Up', {})
+                down_book = data.get('order_books', {}).get('Down', {})
+
+                # Process and round all numeric data
+                row = [
+                    timestamp_str, target_time_str, expiration_str,
+                    round(up_book.get('best_bid', 0.0), 3),
+                    round(up_book.get('best_ask', 0.0), 3),
+                    round(up_book.get('mid_price', 0.0), 3),
+                    round(up_book.get('spread', 0.0), 3),
+                    round(up_book.get('bid_liquidity', 0.0), 3),
+                    round(up_book.get('ask_liquidity', 0.0), 3),
+                    round(down_book.get('best_bid', 0.0), 3),
+                    round(down_book.get('best_ask', 0.0), 3),
+                    round(down_book.get('mid_price', 0.0), 3),
+                    round(down_book.get('spread', 0.0), 3),
+                    round(down_book.get('bid_liquidity', 0.0), 3),
+                    round(down_book.get('ask_liquidity', 0.0), 3)
+                ]
+                final_rows_to_write.append(row)
             
+            # 3. Perform the single I/O operation
             try:
                 with open(DATA_FILE, mode='a', newline='') as file:
                     writer = csv.writer(file)
-                    writer.writerows(rows_to_write)
-                print(f"--> Flushed {len(rows_to_write)} records to disk.")
+                    writer.writerows(final_rows_to_write)
+                print(f"--> Flushed {len(final_rows_to_write)} records to disk.")
             except Exception as e:
                 print(f"Error writing to CSV: {e}")
 
