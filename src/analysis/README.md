@@ -21,6 +21,7 @@ The following strategies are included in the `src/analysis/strategies/` director
 -   **`RebalancingStrategy`**: A sophisticated strategy that aims to accumulate paired positions (both UP and DOWN contracts) when profitable opportunities arise, while maintaining a balanced portfolio to hedge risk.
 -   **`PredictionStrategy`**: A simpler, event-driven strategy that trades based on sharp price movements and liquidity imbalances, aiming to capitalize on short-term momentum.
 -   **`HybridStrategy`**: A strategy that combines the `PredictionStrategy` and `RebalancingStrategy`. It uses prediction signals to initiate a trade and rebalancing logic to manage the position afterward.
+-   **`MovingAverageStrategy`**: A classic momentum strategy that uses the crossover of two simple moving averages (SMAs) of the mid-price to generate buy signals. It's a good example of a stateful strategy.
 
 ## Implementing a Custom Strategy
 
@@ -53,7 +54,7 @@ The backtester is designed to be easily extensible. You can create your own trad
         -   `side` (str): Either `'Up'` or `'Down'`.
         -   `quantity` (float): The number of shares to buy.
         -   `entry_price` (float): The price at which to buy the shares (e.g., `data_point['UpAsk']`).
-        -   `score` (float): A score representing the signal strength (optional, used for logging).
+        -   `score` (float): A numeric value representing the signal strength (e.g., the difference between two moving averages). This is not used by the backtester for any calculations but is recorded in the trade logs, making it invaluable for post-analysis and debugging.
 
 4.  **Example Implementation**:
 
@@ -115,14 +116,30 @@ The backtester is designed to be easily extensible. You can create your own trad
 
 ### Note on Stateful Strategies
 
-Some strategies, like the `MovingAverageStrategy` example above, need to maintain a state (e.g., a history of prices) across multiple calls to the `decide()` method. The backtester supports this naturally. Any instance variables you define in your strategy's `__init__` method will persist throughout the backtest.
+Some strategies, like the `MovingAverageStrategy` example above, need to maintain a state (e.g., a history of prices) across multiple calls to the `decide()` method. The backtester supports this naturally. Any instance variables you define in your strategy's `__init__` method will persist throughout the backtest of a single market.
 
-For more advanced state management that might involve updating the portfolio based on trade confirmations, the backtester checks if a strategy has an `update_portfolio` method. If it does, it will call it after a trade is successfully executed.
+**Important**: The backtester creates a new instance of the strategy for each market to prevent data leakage from one market to the next.
+
+For more advanced state management, such as updating your portfolio based on trade confirmations, the backtester includes a powerful optional callback: the `update_portfolio` method.
+
+-   **How it Works**: After a trade is successfully executed, the backtester checks if the strategy instance has a method named `update_portfolio`.
+-   **Implementation**: If the method exists, the backtester will call it, passing a dictionary containing the details of the confirmed trade (e.g., `side`, `quantity`, `price`). This allows your strategy to update its internal state *after* a trade is confirmed.
 
 ```python
 # In your strategy class
 def update_portfolio(self, trade_confirmation):
-    # trade_confirmation is a dict containing details of the trade
-    print(f"Trade confirmed: {trade_confirmation}")
-    # Update your strategy's internal state based on the trade
+    """
+    Optional method. Called by the backtester after a trade is executed.
+    'trade_confirmation' is a dict with trade details.
+    """
+    side = trade_confirmation['side']
+    quantity = trade_confirmation['quantity']
+
+    # Example: Update internal position tracking
+    if side == 'Up':
+        self.my_up_position += quantity
+    else:
+        self.my_down_position += quantity
+
+    print(f"Portfolio updated: Just bought {quantity} {side} shares.")
 ```

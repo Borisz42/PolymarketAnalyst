@@ -22,6 +22,7 @@ This project is a tool for monitoring and analyzing Polymarket's 15-minute Bitco
 -   **`src/analysis/backtester.py`**: The main backtesting engine. It simulates trading strategies on historical data, handles PnL calculations, and provides a detailed report. It is strategy-agnostic.
 -   **`src/analysis/prediction_backtester.py`**: A specialized backtester script that includes a `preprocess_data` function to create features needed for the `PredictionStrategy`. It uses the main `Backtester` class to run the simulation.
 -   **`src/analysis/hybrid_backtester.py`**: A backtester script for the `HybridStrategy`.
+-   **`src/analysis/moving_average_backtester.py`**: A backtester script for the `MovingAverageStrategy`.
 -   **`src/analysis/signal_accuracy_checker.py`**: A script to analyze the accuracy of trading signals.
 -   **`src/analysis/strategies/`**: This directory contains the trading strategies. All strategies inherit from `src/analysis/strategies/base_strategy.py`.
 -   **`src/config.py`**: Centralized configuration for the project. The `ANALYSIS_DATE` variable is important for selecting which day's data to use for backtesting. Set to `0` to use the latest data.
@@ -52,6 +53,10 @@ Before running a backtester, ensure the `ANALYSIS_DATE` in `src/config.py` is se
 -   **To run the `HybridStrategy`:**
     ```bash
     python -m src.analysis.hybrid_backtester
+    ```
+-   **To run the `MovingAverageStrategy`:**
+    ```bash
+    python -m src.analysis.moving_average_backtester
     ```
 
 ### Analysis
@@ -89,6 +94,12 @@ You may need to install pytest first: `pip install pytest`.
 
 -   **Objective**: To combine the `PredictionStrategy` and `RebalancingStrategy` to improve performance.
 -   **Logic**: It uses the `PredictionStrategy`'s signal to initiate a trade, and then uses the `RebalancingStrategy`'s logic to manage the position. This allows the strategy to enter trades based on market momentum, and then manage risk by seeking to create balanced pairs.
+
+### `MovingAverageStrategy`
+
+-   **Objective**: To trade on market momentum using a classic Simple Moving Average (SMA) crossover signal.
+-   **Logic**: This is a stateful strategy. It maintains a history of recent mid-prices to calculate a short-window and a long-window SMA. A buy signal for "Up" is generated when the short-window SMA crosses above the long-window SMA, indicating positive momentum. It includes several configurable risk management filters, such as a time window to restrict trading to the middle of the market, and thresholds for volatility and spread to avoid trading in unfavorable conditions.
+-   **Features**: This strategy relies on pre-calculated features created in `src/analysis/moving_average_backtester.py`. These include `UpMid`, `Volatility`, and `Spread`.
 
 ## Development Conventions
 
