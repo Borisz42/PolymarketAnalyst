@@ -88,6 +88,10 @@ def process_trades(activities: list, market_details: dict, source_target_time: s
     """Processes raw trade activities from the Data API into the desired format."""
     processed = []
     for trade in activities:
+        # Filter out invalid trades
+        if not trade.get("outcome") or float(trade.get("size", 0)) == 0:
+            continue
+
         # Data API timestamp is an integer (Unix timestamp in seconds)
         timestamp_unix = trade.get("timestamp")
         if timestamp_unix is not None:
@@ -96,13 +100,20 @@ def process_trades(activities: list, market_details: dict, source_target_time: s
         else:
             timestamp_formatted = None
 
+        exp_time_str = market_details.get("expirationTime", "")
+        if exp_time_str:
+            exp_time_dt = datetime.fromisoformat(exp_time_str.replace('Z', '+00:00'))
+            exp_time_formatted = exp_time_dt.strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            exp_time_formatted = None
+
         processed.append({
             "timestamp": timestamp_formatted,
-            "trade_side": trade.get("outcome_name"), # e.g., 'Up' or 'Down'
-            "quantity": float(trade.get("size_in_usd", 0)),
+            "trade_side": trade.get("outcome"),
+            "quantity": float(trade.get("size", 0)),
             "price": float(trade.get("price", 0)),
             "TargetTime": source_target_time,
-            "ExpirationTime": market_details.get("expirationTime"),
+            "ExpirationTime": exp_time_formatted,
         })
     return processed
 
