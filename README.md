@@ -38,12 +38,15 @@ The project is organized into the following structure. For more detailed informa
 │   │   ├── analyze_prices.py
 │   │   ├── backtester.py
 │   │   ├── hybrid_backtester.py
+│   │   ├── moving_average_backtester.py
 │   │   ├── prediction_backtester.py
+│   │   ├── preprocessing.py
 │   │   ├── signal_accuracy_checker.py
 │   │   └── strategies/
 │   │       ├── __init__.py
 │   │       ├── base_strategy.py
 │   │       ├── hybrid_strategy.py
+│   │       ├── moving_average_strategy.py
 │   │       ├── prediction_strategy.py
 │   │       └── rebalancing_strategy.py
 │   ├── config.py
@@ -111,6 +114,14 @@ INITIAL_CAPITAL = 1000.0
         ```bash
         python -m src.analysis.hybrid_backtester
         ```
+   -   **Moving Average Strategy:**
+        ```bash
+        python -m src.analysis.moving_average_backtester
+        ```
+3.  **Launch the dashboard:**
+    ```bash
+    streamlit run src/dashboard/dashboard.py
+    ```
 
 ### Analysis Scripts
 
@@ -138,10 +149,13 @@ The script will generate two output files in the `logs/` directory:
 -   `reverse_engineering_summary.txt`: A high-level summary of the analysis run.
 -   `reverse_engineering_log.csv`: A detailed CSV file containing the market conditions and portfolio state for each trade, perfect for further analysis in tools like Jupyter notebooks.
 
-3.  **Launch the dashboard:**
-    ```bash
-    streamlit run src/dashboard/dashboard.py
-    ```
+
+### Trader's Insight
+
+-   **Start with Data**: Before running a backtest, use the **Dashboard** to visually inspect the market data for the day you want to analyze. This can provide valuable context and help you form a hypothesis about which strategy might perform well.
+-   **Parameter Tuning**: The profitability of a strategy is highly sensitive to its parameters (e.g., the window sizes in the `MovingAverageStrategy`). Don't be discouraged by initial losses. The best approach is to backtest, analyze the results, tune one parameter at a time, and repeat.
+-   **Understand the "Why"**: After a backtest, review the generated `detailed_log_..._trades.csv` file in the `logs/` directory. This provides a trade-by-trade account of the strategy's decisions. Correlate this with the dashboard charts to understand *why* the strategy succeeded or failed in specific market conditions. For example, did the `PredictionStrategy` fail because its `SharpEvent` filter was too sensitive and triggered on noise?
+-   **No "One-Size-Fits-All"**: A strategy that is profitable on one day's volatile data may perform poorly on another day's sideways market. The goal of this framework is to find strategies that are consistently profitable across a wide range of market conditions.
 
 ### Using the Dashboard
 
