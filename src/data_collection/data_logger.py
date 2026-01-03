@@ -65,9 +65,9 @@ def fetch_worker():
 
 def writer_thread():
     """
-    CPU-bound worker. Drains the queue, processes the raw data in a batch,
-    and writes the final, formatted rows to disk. This centralizes the CPU work
-    for better efficiency and cache locality.
+    Worker thread that drains the queue, processes raw data in CPU-intensive batches,
+    and writes the final, formatted rows to disk. This centralizes the data processing
+    while performing a single batched disk I/O operation per flush.
     """
     print("Writer thread started.")
     while True:
