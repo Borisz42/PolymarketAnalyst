@@ -7,6 +7,7 @@ from collections import deque
 from decimal import Decimal
 import logging
 import inspect
+import heapq
 
 DATA_FILE = config.get_analysis_filename()
 
@@ -270,25 +271,24 @@ class Backtester:
                       f"Elapsed: {datetime.timedelta(seconds=int(elapsed_time))}, "
                       f"ETA: {datetime.timedelta(seconds=int(eta))}", end="")
 
-            positions_to_remove_indices = []
+            # --- OPTIMIZATION: Use a min-heap for open positions ---
+            # This while loop efficiently processes only the positions that have expired
+            # by checking the top of the heap. This avoids iterating over all open
+            # positions at every timestamp, changing the complexity from O(P) to
+            # O(log P) for each expired position (where P is # of open positions).
+            resolved_this_timestamp = False
+            while self.open_positions and self.open_positions[0][0] <= current_timestamp:
+                expiration, position = heapq.heappop(self.open_positions)
+                market_id_tuple = position['market_id']
 
-            # Process open positions for expiration at current_timestamp or earlier
-            for pos_index, position in enumerate(self.open_positions):
-                if current_timestamp >= position['expiration']:
-                    market_id_tuple = position['market_id']
+                resolved_info = self._resolve_single_position(market_id_tuple, position, current_timestamp)
 
-                    resolved_info = self._resolve_single_position(market_id_tuple, position, current_timestamp)
+                if market_id_tuple not in self.pending_market_summaries:
+                    self.pending_market_summaries[market_id_tuple] = []
+                self.pending_market_summaries[market_id_tuple].append(resolved_info)
+                resolved_this_timestamp = True
 
-                    if market_id_tuple not in self.pending_market_summaries:
-                        self.pending_market_summaries[market_id_tuple] = []
-                    self.pending_market_summaries[market_id_tuple].append(resolved_info)
-
-                    positions_to_remove_indices.append(pos_index)
-
-            # Remove resolved positions from self.open_positions
-            if positions_to_remove_indices:
-                for index in sorted(positions_to_remove_indices, reverse=True):
-                    del self.open_positions[index]
+            if resolved_this_timestamp:
                 self.portfolio_history.append((current_timestamp, self.capital))
 
             # No need to filter `market_data` anymore, as `current_data_points` is the slice.
@@ -307,10 +307,14 @@ class Backtester:
                         self.capital -= cost
                         if hasattr(strategy_instance, 'update_portfolio'):
                             strategy_instance.update_portfolio(market_id_tuple, side, quantity, entry_price)
-                        self.open_positions.append({
+
+                        # The heap stores tuples of (expiration_time, position_data)
+                        position_data = {
                             'market_id': market_id_tuple, 'side': side, 'quantity': quantity,
                             'entry_price': entry_price, 'expiration': row['Expiration']
-                        })
+                        }
+                        heapq.heappush(self.open_positions, (row['Expiration'], position_data))
+
                         trade_log_entry = {
                             'Timestamp': current_timestamp, 'Type': 'Buy', 'MarketID': market_id_tuple,
                             'Side': side, 'Quantity': quantity, 'EntryPrice': entry_price,
@@ -328,13 +332,14 @@ class Backtester:
                         self.logger.warning(f"INSUFFICIENT CAPITAL: {event['details']}")
         
         final_timestamp = current_timestamp if current_timestamp else datetime.datetime.now(datetime.timezone.utc)
-        for position in self.open_positions[:]:
+        # Resolve any remaining open positions in the heap
+        while self.open_positions:
+            expiration, position = heapq.heappop(self.open_positions)
             market_id_tuple = position['market_id']
             resolved_info = self._resolve_single_position(market_id_tuple, position, final_timestamp)
             if market_id_tuple not in self.pending_market_summaries:
                 self.pending_market_summaries[market_id_tuple] = []
             self.pending_market_summaries[market_id_tuple].append(resolved_info)
-            self.open_positions.remove(position)
 
         for market_id_tuple, resolutions_data in self.pending_market_summaries.items():
             self._print_market_summary(market_id_tuple, resolutions_data)
