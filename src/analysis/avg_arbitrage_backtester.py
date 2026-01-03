@@ -8,18 +8,20 @@ def main():
     """
     Main function to run the backtester for the AvgArbitrageStrategy.
     """
-    # Load data
+    # Determine data file path
     if ANALYSIS_DATE == 0:
-        # get the latest file from the data directory
         data_dir = 'data'
-        files = os.listdir(data_dir)
-        files.sort()
-        latest_file = files[-1]
+        # Filter for market data files and get the latest one
+        market_files = sorted([f for f in os.listdir(data_dir) if f.startswith('market_data_')])
+        if not market_files:
+            print("Error: No market_data files found in the data directory.")
+            return
+        latest_file = market_files[-1]
         filepath = os.path.join(data_dir, latest_file)
+        print(f"Running backtest on the latest dataset: {latest_file}")
     else:
         filepath = f'data/{ANALYSIS_DATE}_market_data.csv'
-
-    market_data = pd.read_csv(filepath)
+        print(f"Running backtest on specified dataset: {filepath}")
 
     # Initialize strategy
     strategy = AvgArbitrageStrategy(
@@ -29,10 +31,20 @@ def main():
     )
 
     # Initialize backtester
-    backtester = Backtester(market_data, strategy)
+    backtester = Backtester()
+
+    # Load data
+    try:
+        backtester.load_data(filepath)
+    except FileNotFoundError as e:
+        print(f"Failed to load data: {e}")
+        return
 
     # Run backtest
-    backtester.run()
+    backtester.run_strategy(strategy)
+
+    # Generate and print the report
+    backtester.generate_report()
 
 if __name__ == "__main__":
     main()

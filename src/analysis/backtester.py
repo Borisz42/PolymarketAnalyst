@@ -296,11 +296,12 @@ class Backtester:
                 market_id_tuple = (row['TargetTime'], row['Expiration'])
                 trade_decision = strategy_instance.decide(row, self.capital)
                 
-                if trade_decision:
+                side, quantity, entry_price, _ = trade_decision
+                if side is not None and quantity > 0:
                     if current_timestamp >= row['Expiration']:
                         self.logger.warning(f"Trade rejected for {market_id_tuple} at {current_timestamp}: market already expired.")
                         continue
-                    side, quantity, entry_price, _ = trade_decision
+
                     entry_price = self._apply_slippage(current_timestamp, market_id_tuple, side, entry_price)
                     cost = quantity * entry_price
                     if self.capital >= cost:
