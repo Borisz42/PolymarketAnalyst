@@ -99,5 +99,85 @@ class TestUserTradeCollector(unittest.TestCase):
         self.assertEqual(constructor_call_args[0]["trade_side"], "Up")
         self.assertEqual(constructor_call_args[0]["quantity"], 100.0)
 
+    @patch("requests.get")
+    def test_get_user_activity_pagination(self, mock_get):
+        """Test that get_user_activity handles pagination and sorting correctly."""
+        # Create a mock response for a full page
+        # Ensure timestamps are in a specific order to test sorting
+        full_page_response = [{"timestamp": i, "outcome": "Up", "size": "1.0", "price": "0.5"} for i in range(1, 501)]
+        # Create a mock response for the last page, with an unsorted timestamp to test sorting
+        last_page_response = [{"timestamp": 502, "outcome": "Down", "size": "2.0", "price": "0.6"},
+                              {"timestamp": 0, "outcome": "Down", "size": "2.0", "price": "0.6"}] # Timestamp 0 for testing sort
+
+        # Set up the mock to return different values on subsequent calls
+        mock_response1 = MagicMock()
+        mock_response1.json.return_value = full_page_response
+        mock_response1.raise_for_status.return_value = None
+
+        mock_response2 = MagicMock()
+        mock_response2.json.return_value = last_page_response
+        mock_response2.raise_for_status.return_value = None
+
+        mock_get.side_effect = [mock_response1, mock_response2]
+
+        activities = get_user_activity("test-event-id", TRACKED_USER_ADDRESS)
+
+        # Check that both requests were made
+        self.assertEqual(mock_get.call_count, 2)
+        
+        # Check that the total number of activities is correct
+        self.assertEqual(len(activities), 502)
+
+        # Check that the activities are sorted by timestamp
+        for i in range(len(activities) - 1):
+            self.assertLessEqual(activities[i]["timestamp"], activities[i+1]["timestamp"],
+                                 f"Activities not sorted at index {i}: {activities[i]['timestamp']} > {activities[i+1]['timestamp']}")
+
+        # Verify specific items after sorting
+        self.assertEqual(activities[0]["timestamp"], 0) # The one with timestamp 0 should be first
+        self.assertEqual(activities[1]["timestamp"], 1)
+        self.assertEqual(activities[501]["timestamp"], 502) # The one with timestamp 502 should be last
+
+    @patch("requests.get")
+    def test_get_user_activity_merging_duplicates(self, mock_get):
+        """Test that get_user_activity correctly merges duplicates by summing their 'size'."""
+        # Page 1 with a trade, 500 times
+        page1_response = [{"timestamp": 100, "outcome": "Up", "size": "10.0", "price": "0.5"}] * 500
+        # Page 2 with another trade that is a duplicate of the first one, and a new trade
+        page2_response = [{"timestamp": 100, "outcome": "Up", "size": "15.0", "price": "0.5"},
+                          {"timestamp": 200, "outcome": "Down", "size": "5.0", "price": "0.6"}]
+
+        mock_response1 = MagicMock()
+        mock_response1.json.return_value = page1_response
+        mock_response1.raise_for_status.return_value = None
+        
+        mock_response2 = MagicMock()
+        mock_response2.json.return_value = page2_response
+        mock_response2.raise_for_status.return_value = None
+
+        mock_get.side_effect = [mock_response1, mock_response2]
+
+        activities = get_user_activity("test-event-id", TRACKED_USER_ADDRESS)
+
+        # We expect 2 calls
+        self.assertEqual(mock_get.call_count, 2)
+
+        # We expect 2 activities after merging
+        self.assertEqual(len(activities), 2)
+        
+        # The first activity should be the one with timestamp 100
+        # and its size should be the sum of the duplicates (500 * 10.0 + 15.0 = 5015.0)
+        activity1 = next(act for act in activities if act['timestamp'] == 100)
+        self.assertEqual(float(activity1['size']), 5015.0)
+        
+        # The second activity should be the one with timestamp 200
+        activity2 = next(act for act in activities if act['timestamp'] == 200)
+        self.assertEqual(float(activity2['size']), 5.0)
+
+        # Also check if the final list is sorted
+        self.assertEqual(activities[0]['timestamp'], 100)
+        self.assertEqual(activities[1]['timestamp'], 200)
+
+
 if __name__ == "__main__":
     unittest.main()

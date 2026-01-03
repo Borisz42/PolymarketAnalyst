@@ -43,19 +43,59 @@ def get_market_details(slug: str) -> dict | None:
         return None
 
 def get_user_activity(event_id: str, user_address: str) -> list:
-    """Fetches user trade activity for a specific eventId from the Data API."""
-    params = {
-        "eventId": event_id,
-        "user": user_address,
-        "limit": 1000,  # A high limit to fetch all trades for the market
-    }
-    try:
-        response = requests.get(DATA_API_URL, params=params, timeout=10)
-        response.raise_for_status()
-        return response.json()
-    except requests.RequestException as e:
-        print(f"Error fetching user activity for eventId '{event_id}': {e}")
-        return []
+    """Fetches all user trade activity for a specific eventId from the Data API using pagination."""
+    all_activities = []
+    offset = 0
+    limit = 500
+
+    while True:
+        params = {
+            "eventId": event_id,
+            "user": user_address,
+            "limit": limit,
+            "offset": offset,
+            "sortDirection": "ASC",
+            "sortBy": "timestamp",
+            "type": "TRADE",
+        }
+        try:
+            response = requests.get(DATA_API_URL, params=params, timeout=10)
+            response.raise_for_status()
+            activities = response.json()
+            all_activities.extend(activities)
+
+            if len(activities) < limit or offset >= 10000:
+                break  # Last page
+            else:
+                print(f"  - Fetched {len(all_activities)} activities so far. Continuing to next page...")
+
+            offset += limit
+
+        except requests.RequestException as e:
+            print(f"Error fetching user activity for eventId '{event_id}' with offset {offset}: {e}")
+            # Return what we have so far, as the rest might not be fetchable
+            break
+    # Merge duplicates by summing their 'size'
+    merged_activities = {}
+    for activity in all_activities:
+        # Create a key from all items except 'size'
+        key_items = frozenset(item for item in activity.items() if item[0] != 'size')
+        
+        if key_items in merged_activities:
+            # If duplicate, sum the 'size'
+            existing_size = float(merged_activities[key_items].get('size', 0))
+            new_size = float(activity.get('size', 0))
+            merged_activities[key_items]['size'] = str(existing_size + new_size) # Keep it as string
+        else:
+            # If new, add it to our dict, ensuring 'size' is a string
+            activity_copy = activity.copy()
+            activity_copy['size'] = str(activity.get('size', '0'))
+            merged_activities[key_items] = activity_copy
+
+    unique_activities = list(merged_activities.values())
+    unique_activities.sort(key=lambda x: x.get("timestamp", 0))
+    
+    return unique_activities
 
 def get_slugs_for_date(date_str: str) -> dict[str, str]:
     """
