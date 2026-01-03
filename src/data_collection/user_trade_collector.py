@@ -28,8 +28,14 @@ def get_market_details(slug: str) -> dict | None:
             return None
         # The API returns a list, we assume the first is the correct one
         market_data = data[0]
+        events = market_data.get("events")
+        if not events or not isinstance(events, list) or len(events) == 0:
+            print(f"Warning: No 'events' array found for slug '{slug}'")
+            return None
+
+        event_data = events[0]
         return {
-            "eventId": market_data.get("id"), # Use the top-level ID
+            "eventId": event_data.get("id"),
             "expirationTime": market_data.get("endDate"),
         }
     except requests.RequestException as e:
@@ -82,10 +88,10 @@ def process_trades(activities: list, market_details: dict, source_target_time: s
     """Processes raw trade activities from the Data API into the desired format."""
     processed = []
     for trade in activities:
-        # Data API timestamp is in ISO 8601 format with 'Z'
-        timestamp_str = trade.get("timestamp", "")
-        if timestamp_str:
-            timestamp_dt = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+        # Data API timestamp is an integer (Unix timestamp in seconds)
+        timestamp_unix = trade.get("timestamp")
+        if timestamp_unix is not None:
+            timestamp_dt = datetime.fromtimestamp(int(timestamp_unix), tz=timezone.utc)
             timestamp_formatted = timestamp_dt.strftime('%Y-%m-%d %H:%M:%S')
         else:
             timestamp_formatted = None
@@ -103,7 +109,7 @@ def process_trades(activities: list, market_details: dict, source_target_time: s
 def main():
     """Main function to collect user trades for a specific date."""
     parser = argparse.ArgumentParser(description="Collect user trades from Polymarket for a given date.")
-    parser.add-argument("--date", required=True, help="The date to collect data for, in YYYYMMDD format.")
+    parser.add_argument("--date", required=True, help="The date to collect data for, in YYYYMMDD format.")
     args = parser.parse_args()
 
     print(f"Starting user trade collection for date: {args.date}")

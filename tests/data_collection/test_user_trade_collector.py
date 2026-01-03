@@ -28,13 +28,13 @@ class TestUserTradeCollector(unittest.TestCase):
             'TargetTime': ['2025-12-30 15:00:00', '2025-12-30 15:00:00'],
         })
         self.mock_market_details_response = {
-            "id": "test-event-id", # Top-level ID
-            "event": {"id": "nested-ignored-id"}, # Nested, ignored ID
+            "id": "top-level-ignored-id",
+            "events": [{"id": "test-event-id"}],
             "endDate": "2025-12-30T15:00:00Z",
         }
         self.mock_user_activity_response = [
             {
-                "timestamp": "2025-12-30T14:00:00Z",
+                "timestamp": 1767103200, # Unix timestamp for 2025-12-30 14:00:00 UTC
                 "outcome_name": "Up",
                 "size_in_usd": "100.0",
                 "price": "0.50",
