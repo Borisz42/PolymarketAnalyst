@@ -45,7 +45,7 @@ def fetch_worker():
             return
 
         # Check for essential data before queueing
-        if not fetched_data or 'order_books' not in fetched_data:
+        if not fetched_data or not fetched_data.get('order_books'):
             print(f"[{timestamp_utc.strftime('%Y-%m-%d %H:%M:%S')}] Incomplete data received")
             return
 
