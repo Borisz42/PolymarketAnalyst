@@ -89,6 +89,7 @@ def analyze(market_data_path, user_data_path):
         axis=1
     )
     result_df['PortfolioUnhedgedDelta'] = result_df['PortfolioQtyUp'] - result_df['PortfolioQtyDown']
+    result_df['AvgPriceSum'] = result_df['PortfolioAvgPriceUp'] + result_df['PortfolioAvgPriceDown']
 
     # --- Finalize and Log CSV ---
     result_df.rename(columns={
@@ -101,7 +102,7 @@ def analyze(market_data_path, user_data_path):
     }, inplace=True)
 
     market_data_columns = [col for col in market_df.columns if col not in ['Timestamp', 'TargetTime']]
-    portfolio_columns = ['PortfolioQtyUp', 'PortfolioAvgPriceUp', 'PortfolioQtyDown', 'PortfolioAvgPriceDown', 'PortfolioUnhedgedDelta']
+    portfolio_columns = ['PortfolioQtyUp', 'PortfolioAvgPriceUp', 'PortfolioQtyDown', 'PortfolioAvgPriceDown', 'PortfolioUnhedgedDelta', 'AvgPriceSum']
     trade_columns = ['TradeTimestamp', 'TradeSide', 'TradeQuantity', 'TradePrice']
 
     final_columns = ['MarketTargetTime'] + trade_columns + ['MarketDataTimestamp'] + portfolio_columns + market_data_columns
