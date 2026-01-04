@@ -341,8 +341,16 @@ class Backtester:
         self.pending_market_summaries.clear()
 
     def generate_report(self):
-        buy_trades = [t for t in self.transactions if t['Type'] == 'Buy']
-        resolution_trades = [t for t in self.transactions if t['Type'] == 'Resolution']
+        # --- OPTIMIZATION: Single-pass transaction filtering ---
+        # Instead of iterating over the transactions list twice, this loop
+        # categorizes all transactions in a single pass, which is more efficient.
+        buy_trades = []
+        resolution_trades = []
+        for t in self.transactions:
+            if t['Type'] == 'Buy':
+                buy_trades.append(t)
+            elif t['Type'] == 'Resolution':
+                resolution_trades.append(t)
         total_pnl = self.capital - self.initial_capital
         roi = (total_pnl / self.initial_capital) * 100 if self.initial_capital > 0 else 0
         self.max_drawdown = self._calculate_max_drawdown()
