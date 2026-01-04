@@ -122,7 +122,7 @@ class Backtester:
         }
         self.transactions.append(resolution_log_entry)
         self.transactions_by_market.setdefault(market_id_tuple, []).append(resolution_log_entry)
-        self.logger.info(f"RESOLUTION: {resolution_log_entry}")
+        self.logger.info(f"RESOLUTION: {current_timestamp.strftime('%Y-%m-%d %H:%M:%S')} Side: {position['side']}, Quantity: {position['quantity']}, EntryPrice: {position['entry_price']}, PnL: {pnl:.2f}")
         
         return {
             'market_id': market_id_tuple, 'side': position['side'], 'quantity': position['quantity'],
@@ -318,7 +318,7 @@ class Backtester:
                         }
                         self.transactions.append(trade_log_entry)
                         self.transactions_by_market.setdefault(market_id_tuple, []).append(trade_log_entry)
-                        self.logger.info(f"TRADE: {trade_log_entry}")
+                        self.logger.info(f"TRADE: {current_timestamp.strftime('%Y-%m-%d %H:%M:%S')} Side: {side}, Quantity: {quantity}, EntryPrice: {entry_price}")
                     else:
                         event = {
                             'timestamp': current_timestamp, 'event': 'Insufficient Capital',
@@ -368,7 +368,9 @@ class Backtester:
         winning_trades_count = sum(1 for t in resolution_trades if t['PnL'] > 0)
         losing_trades_count = len(resolution_trades) - winning_trades_count
 
-        self.logger.info("\n--- Imbalanced Market Analysis ---")
+        imbalanced_report_lines = []
+        imbalanced_report_lines.append("\n--- Imbalanced Market Analysis ---")
+
         market_shares = {}
         for trade in buy_trades:
             market_id = trade['MarketID']
@@ -378,13 +380,17 @@ class Backtester:
 
         imbalanced_count = 0
         for market_id, shares in market_shares.items():
-            if shares['Up'] != shares['Down']:
+            if shares['Up'] == 0 or shares['Down'] == 0:
                 imbalanced_count += 1
                 market_id_formatted = f"({market_id[0].strftime('%Y-%m-%d %H:%M:%S')}, {market_id[1].strftime('%Y-%m-%d %H:%M:%S')})"
-                self.logger.info(f"Market {market_id_formatted} is imbalanced: Up={shares['Up']}, Down={shares['Down']}")
+                imbalanced_report_lines.append(f"Market {market_id_formatted} is imbalanced: Up={shares['Up']}, Down={shares['Down']}")
         
         if imbalanced_count == 0:
-            self.logger.info("All traded markets are balanced.")
+            imbalanced_report_lines.append("All traded markets are balanced.")
+        
+        imbalanced_report_lines.append("------------------------------------")
+        self.logger.info("\n".join(imbalanced_report_lines))
+
         
         report_lines.extend([
             f"Number of Markets Traded: {num_markets_played}",

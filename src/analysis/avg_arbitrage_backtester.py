@@ -8,9 +8,9 @@ def main():
     """
     # Initialize strategy
     strategy = AvgArbitrageStrategy(
-        margin=0.01,
-        initial_trade_capital_percentage=0.05,
-        max_capital_allocation_percentage=0.50
+        margin=0.025,
+        initial_trade_capital_percentage=0.08,
+        max_capital_allocation_percentage=0.70
     )
 
     # Initialize backtester

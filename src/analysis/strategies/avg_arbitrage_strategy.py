@@ -8,6 +8,7 @@ class AvgArbitrageStrategy(Strategy):
         self.margin = margin
         self.initial_trade_capital_percentage = initial_trade_capital_percentage
         self.max_capital_allocation_percentage = max_capital_allocation_percentage
+        self.min_imbalance_threshold = 5  
 
         # Use a defaultdict to manage state for each market independently
         self.market_states = defaultdict(lambda: {
@@ -28,17 +29,18 @@ class AvgArbitrageStrategy(Strategy):
         up_price = market_data_point['UpAsk']
         down_price = market_data_point['DownAsk']
 
+        if up_price is None or down_price is None or up_price == 0 or down_price == 0:
+            return None  # Cannot make a decision without both prices
+
         # First trade logic for this specific market
         if state['up_qty'] == 0 and state['down_qty'] == 0:
-            trade_amount = current_capital * self.initial_trade_capital_percentage
-            if down_price < up_price and down_price > 0:
-                qty_to_buy = math.floor(trade_amount / down_price)
+            qty_to_buy = math.floor(current_capital * self.initial_trade_capital_percentage)
+            if down_price < up_price and 0.4 < down_price < 0.6:
                 if qty_to_buy > 0:
                     state['down_qty'] += qty_to_buy
                     state['down_total_cost'] += qty_to_buy * down_price
                     return ('Down', qty_to_buy, down_price, 1.0)
-            elif up_price < down_price and up_price > 0:
-                qty_to_buy = math.floor(trade_amount / up_price)
+            elif up_price < down_price and 0.4 < up_price < 0.6:
                 if qty_to_buy > 0:
                     state['up_qty'] += qty_to_buy
                     state['up_total_cost'] += qty_to_buy * up_price
@@ -50,17 +52,20 @@ class AvgArbitrageStrategy(Strategy):
         side = None
         price = 0
 
-        if state['up_qty'] < state['down_qty'] and up_price > 0:
+        average_down_cost = 0 if state['down_qty'] == 0 else (state['down_total_cost'] / state['down_qty'])
+        average_up_cost = 0 if state['up_qty'] == 0 else (state['up_total_cost'] / state['up_qty'])
+
+        if state['up_qty'] < state['down_qty'] and average_down_cost + up_price < (1 - self.margin):
             numerator = (state['down_qty'] / (1 + self.margin)) - state['up_total_cost'] - state['down_total_cost']
-            if numerator > 0:
-                qty_to_buy = math.floor(numerator / up_price)
+            qty_to_buy = math.floor(numerator / up_price)
+            if state['up_qty'] + qty_to_buy > state['down_qty'] + self.min_imbalance_threshold:
                 side = 'Up'
                 price = up_price
 
-        elif state['down_qty'] < state['up_qty'] and down_price > 0:
+        elif state['down_qty'] < state['up_qty'] and average_up_cost + down_price < (1 - self.margin):
             numerator = (state['up_qty'] / (1 + self.margin)) - state['down_total_cost'] - state['up_total_cost']
-            if numerator > 0:
-                qty_to_buy = math.floor(numerator / down_price)
+            qty_to_buy = math.floor(numerator / down_price)
+            if state['down_qty'] + qty_to_buy > state['up_qty'] + self.min_imbalance_threshold:
                 side = 'Down'
                 price = down_price
 
