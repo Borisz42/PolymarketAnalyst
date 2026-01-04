@@ -36,14 +36,17 @@ The project is organized into the following structure. For more detailed informa
 │   │   ├── README.md
 │   │   ├── __init__.py
 │   │   ├── analyze_prices.py
+│   │   ├── avg_arbitrage_backtester.py
 │   │   ├── backtester.py
 │   │   ├── hybrid_backtester.py
 │   │   ├── moving_average_backtester.py
 │   │   ├── prediction_backtester.py
 │   │   ├── preprocessing.py
+│   │   ├── reverse_engineer.py
 │   │   ├── signal_accuracy_checker.py
 │   │   └── strategies/
 │   │       ├── __init__.py
+│   │       ├── avg_arbitrage_strategy.py
 │   │       ├── base_strategy.py
 │   │       ├── hybrid_strategy.py
 │   │       ├── moving_average_strategy.py
@@ -114,9 +117,13 @@ INITIAL_CAPITAL = 1000.0
         ```bash
         python -m src.analysis.hybrid_backtester
         ```
-   -   **Moving Average Strategy:**
+    -   **Moving Average Strategy:**
         ```bash
         python -m src.analysis.moving_average_backtester
+        ```
+    -   **Average Arbitrage Strategy:**
+        ```bash
+        python -m src.analysis.avg_arbitrage_backtester
         ```
 3.  **Launch the dashboard:**
     ```bash
@@ -125,30 +132,24 @@ INITIAL_CAPITAL = 1000.0
 
 ### Analysis Scripts
 
-#### Reverse Engineering Past Trades
+This project includes several powerful scripts for deeper analysis. For more details on each, see the [Analysis & Backtesting README](src/analysis/README.md).
 
-The `reverse_engineer.py` script is a powerful tool for analyzing historical trading data to understand and replicate past strategies. It takes a market data file and a user's trade history file as input, merging them to reconstruct the portfolio's state (e.g., average price and quantity for both sides) *before* each trade was executed.
-
-This allows for a detailed examination of the market conditions and portfolio state that may have triggered each trade.
-
-**Usage:**
-
-```bash
-python -m src.analysis.reverse_engineer --market-data [path_to_market_data.csv] --user-data [path_to_user_data.csv]
-```
-
-**Example:**
-
-To analyze the trades from December 26, 2025, run the following command:
-
-```bash
-python -m src.analysis.reverse_engineer --market-data data/market_data_20251226.csv --user-data data/user_data_20251226.csv
-```
-
-The script will generate two output files in the `logs/` directory:
--   `reverse_engineering_summary.txt`: A high-level summary of the analysis run.
--   `reverse_engineering_log.csv`: A detailed CSV file containing the market conditions and portfolio state for each trade, perfect for further analysis in tools like Jupyter notebooks.
-
+-   **Analyze Price Statistics**: Get a detailed statistical summary of a day's market data.
+    ```bash
+    python -m src.analysis.analyze_prices
+    ```
+-   **Check Signal Accuracy**: Evaluate the historical accuracy of signals from the `Prediction` and `MovingAverage` strategies.
+    ```bash
+    python -m src.analysis.signal_accuracy_checker
+    ```
+-   **Reverse Engineer Past Trades**: Reconstruct the portfolio and market state for each trade from a user's trade history to understand their strategy.
+    ```bash
+    python -m src.analysis.reverse_engineer --market-data [path_to_market.csv] --user-data [path_to_user.csv]
+    ```
+    **Example:**
+    ```bash
+    python -m src.analysis.reverse_engineer --market-data data/market_data_20251226.csv --user-data data/user_data_20251226.csv
+    ```
 
 ### Trader's Insight
 
