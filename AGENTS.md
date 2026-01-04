@@ -23,7 +23,9 @@ This project is a tool for monitoring and analyzing Polymarket's 15-minute Bitco
 -   **`src/analysis/prediction_backtester.py`**: A specialized backtester script that includes a `preprocess_data` function to create features needed for the `PredictionStrategy`. It uses the main `Backtester` class to run the simulation.
 -   **`src/analysis/hybrid_backtester.py`**: A backtester script for the `HybridStrategy`.
 -   **`src/analysis/moving_average_backtester.py`**: A backtester script for the `MovingAverageStrategy`.
+-   **`src/analysis/avg_arbitrage_backtester.py`**: A backtester script for the `AvgArbitrageStrategy`.
 -   **`src/analysis/signal_accuracy_checker.py`**: A script to analyze the accuracy of trading signals.
+-   **`src/analysis/reverse_engineer.py`**: A script to analyze a user's past trading history to understand the market conditions that led to each trade.
 -   **`src/analysis/strategies/`**: This directory contains the trading strategies. All strategies inherit from `src/analysis/strategies/base_strategy.py`.
 -   **`src/config.py`**: Centralized configuration for the project. The `ANALYSIS_DATE` variable is important for selecting which day's data to use for backtesting. Set to `0` to use the latest data.
 -   **`src/dashboard/dashboard.py`**: A Streamlit-based interactive dashboard for visualizing market data.
@@ -58,12 +60,20 @@ Before running a backtester, ensure the `ANALYSIS_DATE` in `src/config.py` is se
     ```bash
     python -m src.analysis.moving_average_backtester
     ```
+-   **To run the `AvgArbitrageStrategy`:**
+    ```bash
+    python -m src.analysis.avg_arbitrage_backtester
+    ```
 
 ### Analysis
 
 -   **To run the signal accuracy checker:**
     ```bash
     python -m src.analysis.signal_accuracy_checker
+    ```
+-   **To reverse engineer a user's trading strategy:**
+    ```bash
+    python -m src.analysis.reverse_engineer --market-data [path_to_market.csv] --user-data [path_to_user.csv]
     ```
 
 ### Tests
@@ -100,6 +110,11 @@ You may need to install pytest first: `pip install pytest`.
 -   **Objective**: To trade on market momentum using a classic Simple Moving Average (SMA) crossover signal.
 -   **Logic**: This is a stateful strategy. It maintains a history of recent mid-prices to calculate a short-window and a long-window SMA. A buy signal for "Up" is generated when the short-window SMA crosses above the long-window SMA, indicating positive momentum. It includes several configurable risk management filters, such as a time window to restrict trading to the middle of the market, and thresholds for volatility and spread to avoid trading in unfavorable conditions.
 -   **Features**: This strategy relies on pre-calculated features created in `src/analysis/moving_average_backtester.py`. These include `UpMid`, `Volatility`, and `Spread`.
+
+### `AvgArbitrageStrategy`
+
+-   **Objective**: To build a balanced position at a favorable average price.
+-   **Logic**: This is a stateful arbitrage strategy. It first takes a small, initial position on either the "Up" or "Down" side. It then waits for an opportune moment to buy the opposing contract at a price that ensures the total average cost of the complete pair (one "Up" and one "Down") is less than $1.00, taking into account a configurable profit margin. It manages its state on a per-market basis to track open positions and average costs.
 
 ## Development Conventions
 
